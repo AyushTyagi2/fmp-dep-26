@@ -1,0 +1,134 @@
+using Microsoft.EntityFrameworkCore;
+using FmpBackend.Models;
+
+namespace FmpBackend.Data;
+
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options)
+        : base(options) {}
+
+    public DbSet<User> Users { get; set; }
+    public DbSet<Driver> Drivers { get; set; }
+    public DbSet<Vehicle> Vehicles { get; set; }
+    public DbSet<Organization> Organizations { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // OTP table
+
+        // USERS table
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("users");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Phone).HasColumnName("phone");
+            entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
+            entity.Property(e => e.FullName).HasColumnName("full_name");
+
+            entity.Property(e => e.AuthProvider).HasColumnName("auth_provider");
+            entity.Property(e => e.CreatedAt)
+                  .HasColumnName("created_at")
+                  .HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+    // DRIVERS
+modelBuilder.Entity<Driver>(entity =>
+{
+    entity.ToTable("drivers");
+    entity.HasKey(e => e.Id);
+
+    entity.Property(e => e.Id).HasColumnName("id");
+    entity.Property(e => e.UserId).HasColumnName("user_id");
+    entity.Property(e => e.Status).HasColumnName("status");
+
+    entity.Property(e => e.LicenseNumber)
+          .HasColumnName("license_number");
+
+    entity.Property(e => e.LicenseType)
+          .HasColumnName("license_type");
+
+    entity.Property(e => e.LicenseExpiryDate)
+          .HasColumnName("license_expiry_date");
+
+    entity.Property(e => e.CreatedAt)
+          .HasColumnName("created_at")
+          .HasDefaultValueSql("CURRENT_TIMESTAMP");
+});
+
+
+// VEHICLES
+modelBuilder.Entity<Vehicle>(entity =>
+{
+    entity.ToTable("vehicles");
+    entity.HasKey(e => e.Id);
+
+    entity.Property(e => e.Id)
+          .HasColumnName("id");
+
+    entity.Property(e => e.RegistrationNumber)
+          .HasColumnName("registration_number");
+
+    entity.Property(e => e.FleetOwnerId)
+          .HasColumnName("fleet_owner_id");
+
+    entity.Property(e => e.VehicleType)
+          .HasColumnName("vehicle_type");
+
+    entity.Property(e => e.CurrentDriverId)
+          .HasColumnName("current_driver_id");
+
+    // REQUIRED NOT NULL FIELDS
+    entity.Property(e => e.CapacityTons)
+          .HasColumnName("capacity_tons");
+
+    entity.Property(e => e.MaxLoadWeightKg)
+          .HasColumnName("max_load_weight_kg");
+
+    // Good to map these too (they also have defaults / constraints)
+    entity.Property(e => e.Status)
+          .HasColumnName("status");
+
+    entity.Property(e => e.AvailabilityStatus)
+          .HasColumnName("availability_status");
+});
+
+
+ modelBuilder.Entity<Organization>(entity =>
+    {
+        entity.ToTable("organizations");
+        entity.HasKey(e => e.Id);
+
+        entity.Property(e => e.Id).HasColumnName("id");
+        entity.Property(e => e.Name).HasColumnName("name");
+        entity.Property(e => e.OrganizationType).HasColumnName("organization_type");
+
+        entity.Property(e => e.PrimaryContactName).HasColumnName("primary_contact_name");
+        entity.Property(e => e.PrimaryContactPhone).HasColumnName("primary_contact_phone");
+        entity.Property(e => e.PrimaryContactEmail).HasColumnName("primary_contact_email");
+         entity.Property(e => e.RegistrationNumber)
+          .HasColumnName("registration_number");
+        entity.Property(e => e.PanNumber)
+          .HasColumnName("pan_number");
+
+    entity.Property(e => e.GstNumber)
+          .HasColumnName("gst_number");
+        entity.Property(e => e.AddressLine1).HasColumnName("address_line1");
+        entity.Property(e => e.City).HasColumnName("city");
+        entity.Property(e => e.State).HasColumnName("state");
+        entity.Property(e => e.PostalCode).HasColumnName("postal_code");
+
+        entity.Property(e => e.Industry).HasColumnName("industry");
+        entity.Property(e => e.Description).HasColumnName("description");
+
+        entity.Property(e => e.Status).HasColumnName("status");
+        entity.Property(e => e.CreatedAt)
+              .HasColumnName("created_at")
+              .HasDefaultValueSql("CURRENT_TIMESTAMP");
+    });
+}
+    
+}
