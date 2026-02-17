@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../../models/shipment_draft.dart';
 
 
 class SectionTitle extends StatelessWidget {
@@ -20,59 +20,83 @@ class SectionTitle extends StatelessWidget {
 }
 
 class LoadingChargesField extends StatelessWidget {
-  const LoadingChargesField({super.key});
+  final ShipmentDraft draft;
+
+  const LoadingChargesField({
+    super.key,
+    required this.draft,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      initialValue: draft.loadingCharges.toString(),
       keyboardType: TextInputType.number,
       decoration: const InputDecoration(
         labelText: 'Loading Charges',
         border: OutlineInputBorder(),
       ),
+      onChanged: (value) {
+        draft.loadingCharges = double.tryParse(value) ?? 0;
+      },
     );
   }
 }
 
+
 class UnloadingChargesField extends StatelessWidget {
-  const UnloadingChargesField({super.key});
+  final ShipmentDraft draft;
+
+  const UnloadingChargesField({
+    super.key,
+    required this.draft,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      initialValue: draft.unloadingCharges.toString(),
       keyboardType: TextInputType.number,
       decoration: const InputDecoration(
         labelText: 'Unloading Charges',
         border: OutlineInputBorder(),
       ),
+      onChanged: (value) {
+        draft.unloadingCharges = double.tryParse(value) ?? 0;
+      },
     );
   }
 }
 
 class PricingSection extends StatelessWidget {
-  const PricingSection({super.key});
+  final ShipmentDraft draft;
+
+  const PricingSection({
+    super.key,
+    required this.draft,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children:  [
-        SectionTitle(title: 'Pricing'),
-        SizedBox(height: 16),
+      children: [
+        const SectionTitle(title: 'Pricing'),
+        const SizedBox(height: 16),
 
-        AgreedPriceField(),
-        SizedBox(height: 12),
+        AgreedPriceField(draft: draft),
+        const SizedBox(height: 12),
 
-        PricePerUnitDropdown(),
-        SizedBox(height: 12),
+        PricePerUnitDropdown(draft: draft),
+        const SizedBox(height: 12),
 
-        LoadingChargesField(),
-        SizedBox(height: 12),
+        LoadingChargesField(draft: draft),
+        const SizedBox(height: 12),
 
-        UnloadingChargesField(),
-        SizedBox(height: 12),
+        UnloadingChargesField(draft: draft),
+        const SizedBox(height: 12),
 
-        OtherChargesField(),
+        OtherChargesField(draft: draft),
       ],
     );
   }
@@ -80,7 +104,9 @@ class PricingSection extends StatelessWidget {
 
 
 class AgreedPriceField extends StatelessWidget {
-  const AgreedPriceField({super.key});
+  final ShipmentDraft draft;
+
+  const AgreedPriceField({super.key, required this.draft});
 
   @override
   Widget build(BuildContext context) {
@@ -95,11 +121,17 @@ class AgreedPriceField extends StatelessWidget {
 }
 
 class PricePerUnitDropdown extends StatelessWidget {
-  const PricePerUnitDropdown({super.key});
+  final ShipmentDraft draft;
+
+  const PricePerUnitDropdown({
+    super.key,
+    required this.draft,
+  });
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
+      value: draft.pricePerUnit,
       decoration: const InputDecoration(
         labelText: 'Price Per Unit',
         border: OutlineInputBorder(),
@@ -109,22 +141,35 @@ class PricePerUnitDropdown extends StatelessWidget {
         DropdownMenuItem(value: 'per_ton', child: Text('Per Ton')),
         DropdownMenuItem(value: 'per_km', child: Text('Per Km')),
       ],
-      onChanged: (_) {},
+      onChanged: (value) {
+        draft.pricePerUnit = value;
+      },
     );
   }
 }
 
+
 class OtherChargesField extends StatelessWidget {
-  const OtherChargesField({super.key});
+  final ShipmentDraft draft;
+
+  const OtherChargesField({
+    super.key,
+    required this.draft,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      initialValue: draft.otherCharges.toString(),
       keyboardType: TextInputType.number,
       decoration: const InputDecoration(
         labelText: 'Other Charges',
         border: OutlineInputBorder(),
       ),
+      onChanged: (value) {
+        draft.otherCharges = double.tryParse(value) ?? 0;
+      },
     );
   }
 }
+

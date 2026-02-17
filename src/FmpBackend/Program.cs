@@ -4,7 +4,8 @@ using FmpBackend.Repositories;
 using FmpBackend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 // 🔹 LOG (correct way)
 Console.WriteLine("We're in the ASP.NET API!!");
 
@@ -28,6 +29,7 @@ builder.Services.AddScoped<SenderService>();
 builder.Services.AddScoped<OrganizationRepository>();
 builder.Services.AddScoped<SenderService>();
 builder.Services.AddScoped<RoleService>();
+builder.Services.AddScoped<ShipmentService>();
 
 var app = builder.Build();
 

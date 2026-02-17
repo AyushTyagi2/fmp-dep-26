@@ -76,6 +76,22 @@ CREATE INDEX idx_shipments_created_by ON shipments(created_by_user_id);
 -- ============================================================================
 -- 7. TRIPS (OPERATIONAL CORE)
 -- ============================================================================
+CREATE TABLE shipment_queue (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    shipment_id UUID NOT NULL REFERENCES shipments(id),
+
+    zone_id UUID,
+    required_vehicle_type VARCHAR(50),
+
+    status VARCHAR(30) DEFAULT 'waiting',
+    -- waiting, offered, accepted, expired
+
+    current_driver_id UUID,
+    offer_expires_at TIMESTAMP,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE trips (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
