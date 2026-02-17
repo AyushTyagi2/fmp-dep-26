@@ -51,3 +51,5 @@ CREATE INDEX idx_users_phone ON users(phone);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_status ON users(status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_users_kyc_status ON users(kyc_status);
+
+

@@ -47,8 +47,7 @@ CREATE TABLE user_roles (
 
 CREATE INDEX idx_user_roles_user ON user_roles(user_id) WHERE is_active = TRUE;
 CREATE INDEX idx_user_roles_role ON user_roles(role_id) WHERE is_active = TRUE;
-CREATE INDEX idx_user_roles_active ON user_roles(user_id, role_id) WHERE is_active = TRUE AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP);
-
+CREATE INDEX idx_user_roles_active ON user_roles(user_id, role_id) WHERE is_active = TRUE;
 -- Fine-grained permissions
 CREATE TABLE permissions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

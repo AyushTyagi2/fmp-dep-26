@@ -175,4 +175,4 @@ CREATE UNIQUE INDEX idx_trip_analytics_daily_date ON trip_analytics_daily(trip_d
 -- Archive old data (recommended after 2-3 years)
 -- Create archive tables and migration scripts for: activity_logs, trip_locations, notifications
 
-COMMENT ON DATABASE fleet_management IS 'Production database for Fleet Management Platform';
+COMMENT ON DATABASE fmp IS 'Production database for Fleet Management Platform';
