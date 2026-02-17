@@ -94,6 +94,7 @@ class AuthController extends ChangeNotifier {
       _stage = AuthStage.otpSent;
       notifyListeners();
     } catch(e) {
+      print("Error sending OTP: $e");
       _setError("Failed to send OTP");
     }
 
