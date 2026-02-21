@@ -59,6 +59,15 @@ CREATE TABLE organizations (
 CREATE INDEX idx_organizations_status ON organizations(status) WHERE deleted_at IS NULL;
 CREATE INDEX idx_organizations_gst ON organizations(gst_number) WHERE gst_number IS NOT NULL;
 
+ALTER TABLE organizations 
+ALTER COLUMN registration_number DROP NOT NULL;
+
+ALTER TABLE organizations 
+ALTER COLUMN pan_number DROP NOT NULL;
+
+ALTER TABLE organizations 
+ALTER COLUMN gst_number DROP NOT NULL;
+
 -- Organization-User mapping (many-to-many)
 CREATE TABLE organization_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
