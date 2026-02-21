@@ -43,12 +43,14 @@ class _PickupDeliverySectionState
         SectionTitle(title: 'Pickup & Delivery'),
         SizedBox(height: 16),
 
-        PickupAddressField(draft: widget.draft),
-        SizedBox(height: 12),
+        //PickupAddressField(draft: widget.draft),
+        //SizedBox(height: 12),
 
-        DropAddressField(draft: widget.draft),
+        //DropAddressField(draft: widget.draft),
+        //SizedBox(height: 12),
+        ReceiverPhoneField(draft: widget.draft),
         SizedBox(height: 12),
-
+        
         PickupDateField(draft: widget.draft),
         SizedBox(height: 12),
 
@@ -71,7 +73,7 @@ class _PickupDeliverySectionState
 
 
 
-class PickupAddressField extends StatelessWidget {
+/*class PickupAddressField extends StatelessWidget {
   final ShipmentDraft draft;
   const PickupAddressField({super.key, required this.draft});
 
@@ -110,20 +112,45 @@ class DropAddressField extends StatelessWidget {
       onTap: () { draft.dropAddressId = "ADDRESS_ID_SAMPLE";},
     );
   }
-}
+}*/
 
 
-class PickupDateField extends StatelessWidget {
+class ReceiverPhoneField extends StatelessWidget {
   final ShipmentDraft draft;
 
-  const PickupDateField({
-    super.key,
-    required this.draft,
-  });
+  const ReceiverPhoneField({super.key, required this.draft});
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      decoration: const InputDecoration(
+        labelText: 'Receiver Phone Number',
+        border: OutlineInputBorder(),
+      ),
+      keyboardType: TextInputType.phone,
+      onChanged: (value) {
+        draft.receiverPhone = value;
+      },
+    );
+  }
+}
+
+class PickupDateField extends StatefulWidget {
+  final ShipmentDraft draft;
+
+  const PickupDateField({super.key, required this.draft});
+
+  @override
+  State<PickupDateField> createState() => _PickupDateFieldState();
+}
+
+class _PickupDateFieldState extends State<PickupDateField> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: _controller,
       readOnly: true,
       decoration: const InputDecoration(
         labelText: 'Preferred Pickup Date',
@@ -139,7 +166,11 @@ class PickupDateField extends StatelessWidget {
         );
 
         if (selected != null) {
-          draft.preferredPickupDate = selected;
+          setState(() {
+            widget.draft.preferredPickupDate = selected;
+            _controller.text =
+                "${selected.day}/${selected.month}/${selected.year}";
+          });
         }
       },
     );

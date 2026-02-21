@@ -9,7 +9,7 @@ import '../../../data/repositories/shipment_repository.dart';
 import '../../../data/models/shipment/create_shipment_request.dart';
 import '../../../core/network/api_client.dart';
 import 'package:dio/dio.dart';
-
+import 'package:fmp_app/app_session.dart';
 
 
 
@@ -37,22 +37,22 @@ class _SenderCreateShipmentScreenState
   });
 
   try {
-    // 🔹 Convert Draft → Request
-    // 🔥 TEMP TESTING VALUES
-    draft.receiverOrganizationId =
-        "50d2194e-a86b-4aba-919a-e01fba1c0c39";
+   
+    final senderPhone = AppSession.phone;
 
-    // Replace these with REAL address GUIDs from your DB
-    draft.pickupAddressId =
-        "8b4f5a1e-8f90-4c31-9c76-123456789abc";
+    if (senderPhone == null) {
+      // Handle properly (maybe redirect to login)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Session expired. Please login again.")),
+      );
+      return;
+    }
 
-    draft.dropAddressId =
-        "8b4f5a1e-8f90-4c31-9c76-123456789abb";
-
-    final request = draft.toRequest();
+    final request = draft.toRequest(senderPhone);
     print("REQUEST BODY: ${request.toJson()}");  // 👈 ADD THIS
     // 🔹 Setup API
     final apiClient = ApiClient();
+    
 
     // If you have JWT stored somewhere, set it here:
     // apiClient.setAuthToken(AppSession.token);

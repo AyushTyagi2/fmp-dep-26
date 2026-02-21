@@ -7,12 +7,12 @@ public class Organization
     public string Name { get; set; } = null!;
     public string OrganizationType { get; set; } = null!;
 
-    public string? RegistrationNumber { get; set; } = "PENDING";
+    public string? RegistrationNumber { get; set; }
 
 
     public string PrimaryContactName { get; set; } = null!;
-    public string PanNumber { get; set; } = "PENDING";
-    public string GstNumber { get; set; } = "PENDING";
+    public string? PanNumber { get; set; }
+    public string? GstNumber { get; set; }
     public string PrimaryContactPhone { get; set; } = null!;
     public string? PrimaryContactEmail { get; set; }
 

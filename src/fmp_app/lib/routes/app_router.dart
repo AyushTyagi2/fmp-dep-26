@@ -10,6 +10,7 @@ import 'package:fmp_app/presentation/onboarding/driver_onboarding/basic_details/
 import 'package:fmp_app/presentation/auth/approval_pending/approval_pending_screen.dart';
 import 'package:fmp_app/presentation/driver/dashboard/driver_dashboard_screen.dart';
 import 'package:fmp_app/presentation/sender/dashboard/sender_dashboard.dart';
+import 'package:fmp_app/presentation/sys_admin_dashboard/sys_admin_dashboard_screen.dart';
 class AppRouter {
   static const welcome = '/welcome';
   static const phone = '/phone';
@@ -23,6 +24,7 @@ class AppRouter {
   static const approvalPending = '/approval-pending';
   static const driverDashboard = '/driver-dashboard';
   static const sendrecvDashboard = '/organizationuser';
+  static const sysadmin = '/system_admin';
   static final routes = <String, WidgetBuilder>{
     welcome: (_) => const WelcomeScreen(),
     phone: (_) => const PhoneInputScreen(),
@@ -36,7 +38,7 @@ class AppRouter {
     approvalPending: (_) => const ApprovalPendingScreen(),
     driverDashboard: (_) => const DriverDashboardScreen(),
     sendrecvDashboard: (_) => const SenderDashboardScreen(),
-
+    sysadmin: (_) => const SysAdminDashboardScreen(),
 
   };
 }

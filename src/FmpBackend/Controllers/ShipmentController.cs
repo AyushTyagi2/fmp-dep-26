@@ -25,20 +25,22 @@ public class ShipmentsController : ControllerBase
         //var userId = Guid.Parse(User.FindFirst("sub")!.Value);
         // You must fetch sender org from user
         //var senderOrgId = Guid.Parse(User.FindFirst("orgId")!.Value);
-        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        //var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-    var senderOrgId = Guid.Parse(
-        "50d2194e-a86b-4aba-919a-e01fba1c0c39"
-    );
-        var shipment = await _service.CreateShipmentAsync(
-            request,
-            userId,
-            senderOrgId);
+    //var senderOrgId = Guid.Parse(        "50d2194e-a86b-4aba-919a-e01fba1c0c39");
+        var shipment = await _service.CreateShipmentAsync(request);
 
         return Ok(new
         {
             shipment.Id,
             shipment.ShipmentNumber
         });
+    }
+
+    [HttpGet("by-phone/{phone}")]
+    public async Task<IActionResult> GetByPhone(string phone)
+    {
+        var result = await _service.GetShipmentsByPhoneAsync(phone);
+        return Ok(result);
     }
 }

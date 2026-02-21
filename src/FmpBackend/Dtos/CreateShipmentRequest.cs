@@ -1,10 +1,8 @@
 namespace FmpBackend.Dtos;
 public class CreateShipmentRequest
 {
-    public Guid ReceiverOrganizationId { get; set; }
-
-    public Guid PickupAddressId { get; set; }
-    public Guid DropAddressId { get; set; }
+    public string SenderPhone { get; set; } = null!;
+    public string ReceiverPhone { get; set; } = null!;
 
     public string CargoType { get; set; } = default!;
     public string CargoDescription { get; set; } = default!;

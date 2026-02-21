@@ -1,8 +1,9 @@
 class ShipmentDraft {
   // ===== Parties =====
-  String? receiverOrganizationId;
 
   // ===== Cargo =====
+  String? senderPhone;
+  String? receiverPhone;
   String? cargoType;
   String? cargoDescription;
   double? cargoWeightKg;
@@ -10,8 +11,6 @@ class ShipmentDraft {
   int? packageCount;
 
   // ===== Pickup & Delivery =====
-  String? pickupAddressId;
-  String? dropAddressId;
   DateTime? preferredPickupDate;
   DateTime? preferredDeliveryDate;
   bool isUrgent = false;
@@ -37,13 +36,13 @@ class ShipmentDraft {
   String toString() {
     return '''
 ShipmentDraft(
+  senderPhone:$senderPhone,
+  receiverPhone:$receiverPhone,
   cargoType: $cargoType,
   cargoDescription: $cargoDescription,
   cargoWeightKg: $cargoWeightKg,
   cargoVolumeCubicMeters: $cargoVolumeCubicMeters,
   packageCount: $packageCount,
-  pickupAddressId: $pickupAddressId,
-  dropAddressId: $dropAddressId,
   preferredPickupDate: $preferredPickupDate,
   preferredDeliveryDate: $preferredDeliveryDate,
   isUrgent: $isUrgent,

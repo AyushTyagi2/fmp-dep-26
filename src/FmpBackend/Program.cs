@@ -30,7 +30,8 @@ builder.Services.AddScoped<OrganizationRepository>();
 builder.Services.AddScoped<SenderService>();
 builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<ShipmentService>();
-
+builder.Services.AddScoped<ShipmentRepository>();
+builder.Services.AddScoped<AddressRepository>();
 var app = builder.Build();
 
 // 🔹 Map APIs

@@ -1,9 +1,8 @@
 import '../../../presentation/sender/models/shipment_draft.dart';
 
 class CreateShipmentRequest {
-  final String receiverOrganizationId;
-  final String pickupAddressId;
-  final String dropAddressId;
+  final String senderPhone;
+  final String receiverPhone;
 
   final String cargoType;
   final String cargoDescription;
@@ -14,9 +13,8 @@ class CreateShipmentRequest {
   final bool isUrgent;
 
   CreateShipmentRequest({
-    required this.receiverOrganizationId,
-    required this.pickupAddressId,
-    required this.dropAddressId,
+    required this.senderPhone,
+    required this.receiverPhone,
     required this.cargoType,
     required this.cargoDescription,
     required this.cargoWeightKg,
@@ -27,9 +25,8 @@ class CreateShipmentRequest {
 
   Map<String, dynamic> toJson() {
     return {
-      "receiverOrganizationId": receiverOrganizationId,
-      "pickupAddressId": pickupAddressId,
-      "dropAddressId": dropAddressId,
+      "senderPhone": senderPhone,
+      "receiverPhone": receiverPhone,
       "cargoType": cargoType,
       "cargoDescription": cargoDescription,
       "cargoWeightKg": cargoWeightKg,
@@ -42,11 +39,10 @@ class CreateShipmentRequest {
 
 // 👇 EXTENSION MUST BE OUTSIDE THE CLASS
 extension ShipmentDraftMapper on ShipmentDraft {
-  CreateShipmentRequest toRequest() {
+  CreateShipmentRequest toRequest(String senderPhone) {
     return CreateShipmentRequest(
-      receiverOrganizationId: receiverOrganizationId!,
-      pickupAddressId: pickupAddressId!,
-      dropAddressId: dropAddressId!,
+      senderPhone: senderPhone,
+      receiverPhone: receiverPhone ?? "",
       cargoType: cargoType ?? "",
       cargoDescription: cargoDescription ?? "",
       cargoWeightKg: cargoWeightKg ?? 0,
