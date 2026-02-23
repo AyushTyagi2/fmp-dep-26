@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
      <AssemblyName>FmpBackend</AssemblyName>
+    <UserSecretsId>5ce695d6-1192-4cde-a549-a5dedcad0329</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
