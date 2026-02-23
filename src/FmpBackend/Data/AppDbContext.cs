@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Driver> Drivers { get; set; }
     public DbSet<Vehicle> Vehicles { get; set; }
     public DbSet<Organization> Organizations { get; set; }
+      public DbSet<FleetOwner> FleetOwners { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,6 +95,29 @@ modelBuilder.Entity<Vehicle>(entity =>
 
     entity.Property(e => e.AvailabilityStatus)
           .HasColumnName("availability_status");
+});
+
+
+// FLEET OWNERS
+modelBuilder.Entity<FleetOwner>(entity =>
+{
+      entity.ToTable("fleet_owners");
+      entity.HasKey(e => e.Id);
+
+      entity.Property(e => e.Id).HasColumnName("id");
+      entity.Property(e => e.UserId).HasColumnName("user_id");
+
+      entity.Property(e => e.BusinessName).HasColumnName("business_name");
+      entity.Property(e => e.BusinessType).HasColumnName("business_type");
+
+      entity.Property(e => e.BusinessContactPhone).HasColumnName("business_contact_phone");
+      entity.Property(e => e.BusinessContactEmail).HasColumnName("business_contact_email");
+
+      entity.Property(e => e.Status).HasColumnName("status");
+      entity.Property(e => e.Verified).HasColumnName("verified");
+      entity.Property(e => e.CreatedAt)
+              .HasColumnName("created_at")
+              .HasDefaultValueSql("CURRENT_TIMESTAMP");
 });
 
 

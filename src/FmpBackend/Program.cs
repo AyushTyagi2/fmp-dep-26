@@ -26,6 +26,7 @@ builder.Services.AddScoped<DriverRepository>();
 builder.Services.AddScoped<VehicleRepository>();
 builder.Services.AddScoped<SenderService>();
 builder.Services.AddScoped<OrganizationRepository>();
+builder.Services.AddScoped<FleetOwnerRepository>();
 builder.Services.AddScoped<SenderService>();
 builder.Services.AddScoped<RoleService>();
 

@@ -7,15 +7,18 @@ public class RoleService
     private readonly UserRepository _users;
     private readonly DriverRepository _drivers;
     private readonly OrganizationRepository _orgs;
+    private readonly FleetOwnerRepository _fleets;
 
     public RoleService(
         UserRepository users,
         DriverRepository drivers,
-        OrganizationRepository orgs)
+        OrganizationRepository orgs,
+        FleetOwnerRepository fleets)
     {
         _users = users;
         _drivers = drivers;
         _orgs = orgs;
+        _fleets = fleets;
     }
 
     public string Resolve(string phone, string role)
@@ -48,6 +51,15 @@ public class RoleService
             return org != null
                 ? "sender_dashboard"
                 : "sender_onboarding";
+        }
+
+        // 4. Fleet owner role
+        if (role == "fleet_owner")
+        {
+            var fleet = _fleets.GetByUserId(user.Id);
+            return fleet != null
+                ? "fleet_dashboard"
+                : "fleet_onboarding";
         }
 
         return "unknown";

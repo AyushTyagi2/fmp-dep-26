@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'presentation/auth/auth_controller.dart';
 import 'presentation/driver/driver_state.dart';
+import 'presentation/fleetmgr/fleet_state.dart';
 import 'routes/app_router.dart';
 import 'package:fmp_app/presentation/auth/auth_api.dart';
 class MyApp extends StatelessWidget {
@@ -18,6 +19,9 @@ class MyApp extends StatelessWidget {
           create: (context) => AuthController(context.read<AuthApi>()),
         ),
         Provider(create: (_) => DriverState()),
+        ChangeNotifierProvider<FleetState>(
+          create: (_) => FleetState(),
+        ),
         
       ],
       child: MaterialApp(

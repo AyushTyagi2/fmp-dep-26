@@ -142,4 +142,40 @@ BEGIN
         VALUES (v_vehicle_ids[i], v_driver_ids[i], TRUE);
 
     END LOOP;
+    // ...existing code...
+
+-- Ensure auth_provider set for fleet managers inserted above
+UPDATE users
+SET auth_provider = 'local'
+WHERE phone IN (
+  '9876826025',
+  '9876543202',
+  '9876543203',
+  '9876543204'
+) AND auth_provider IS NULL;
+
+-- Ensure auth_provider set for drivers inserted above
+UPDATE users
+SET auth_provider = 'phone_otp'
+WHERE phone IN (
+  '9900000001','9900000002','9900000003','9900000004','9900000005',
+  '9900000006','9900000007','9900000008','9900000009','9900000010'
+) AND auth_provider IS NULL;
+
+UPDATE users
+SET password_hash = 'DUMMY_HASH'
+WHERE phone IN (
+  '9876826025',
+  '9876543202',
+  '9876543203',
+  '9876543204'
+) AND password_hash IS NULL;
+
+-- Set password_hash for drivers if NULL
+UPDATE users
+SET password_hash = 'DUMMY_HASH'
+WHERE phone IN (
+  '9900000001','9900000002','9900000003','9900000004','9900000005',
+  '9900000006','9900000007','9900000008','9900000009','9900000010'
+) AND password_hash IS NULL;
 END $$;

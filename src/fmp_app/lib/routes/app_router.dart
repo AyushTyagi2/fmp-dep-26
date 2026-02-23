@@ -7,9 +7,11 @@ import 'package:fmp_app/presentation/onboarding/role_selection/role_selection_sc
 
 import 'package:fmp_app/presentation/onboarding/sender_onboarding/sender_onboarding_screen.dart';
 import 'package:fmp_app/presentation/onboarding/driver_onboarding/basic_details/driver_basic_details_screen.dart';
+import 'package:fmp_app/presentation/onboarding/fleetmgr_onboarding/fleetmgr_onboarding_screen.dart';
 import 'package:fmp_app/presentation/auth/approval_pending/approval_pending_screen.dart';
 import 'package:fmp_app/presentation/driver/dashboard/driver_dashboard_screen.dart';
 import 'package:fmp_app/presentation/sender/dashboard/sender_dashboard.dart';
+import 'package:fmp_app/presentation/fleetmgr/dashboard/fleet_dashboard_screen.dart';
 class AppRouter {
   static const welcome = '/welcome';
   static const phone = '/phone';
@@ -23,6 +25,8 @@ class AppRouter {
   static const approvalPending = '/approval-pending';
   static const driverDashboard = '/driver-dashboard';
   static const sendrecvDashboard = '/organizationuser';
+  static const fleetOnboarding = '/fleet-onboarding';
+  static const fleetDashboard = '/fleet-dashboard';
   static final routes = <String, WidgetBuilder>{
     welcome: (_) => const WelcomeScreen(),
     phone: (_) => const PhoneInputScreen(),
@@ -31,11 +35,13 @@ class AppRouter {
     roleSelection: (_) => const RoleSelectionScreen(),
     
     senderOnboarding: (_) => const SenderOnboardingScreen(),
+    fleetOnboarding: (_) => const FleetmgrOnboardingScreen(),
     driverBasic: (_) => const DriverBasicDetailsScreen(),
     
     approvalPending: (_) => const ApprovalPendingScreen(),
     driverDashboard: (_) => const DriverDashboardScreen(),
     sendrecvDashboard: (_) => const SenderDashboardScreen(),
+    fleetDashboard: (_) => const FleetDashboardScreen(),
 
 
   };
