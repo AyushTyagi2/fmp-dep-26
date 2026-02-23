@@ -1,0 +1,151 @@
+DRIVER DASHBOARD
+A. Queue Status Card (ALWAYS VISIBLE)
+
+Shows:
+
+Queue name (e.g. Delhi → Jaipur, 12T)
+
+Your current position: #4
+
+Total drivers in queue: 18
+Estimated wait time (rough)
+This alone builds trust.
+
+B. Live Job Feed (Read-Only until your turn)
+
+Drivers can see:
+
+Shipment summary (route, cargo type)
+
+Status:
+
+Assigned to others
+Pending in queue
+No prices
+No sender details
+📌 This prevents rumors & phone calls.
+
+C. Your Turn — Job Offer Modal (CRITICAL)
+
+When driver reaches top of queue:
+Big modal / full-screen
+
+🚚 Job Available
+Route: Delhi → Jaipur
+Truck required: 12T
+Pickup: Today 6 PM
+
+Buttons:
+✅ Accept Job
+❌ Skip (with warning)
+
+D. Skip Logic (Union-Controlled)
+
+When skipping:
+
+Warning text:
+“Skipping may move you to the end of the queue as per union rules.”
+
+System records:
+Accepted
+Skipped
+Timeout
+
+E. After Acceptance
+
+Driver removed from queue
+Trip created
+Driver dashboard switches to Active Trip mode
+
+SENDER DASHBOARD
+A. Shipment Creation
+
+Pickup & drop
+Cargo details
+Instructions
+
+B. Active Shipments
+
+Each shipment card:
+Shipment ID
+Status
+Assigned / unassigned
+Last update time
+
+C. Shipment Detail
+
+Status timeline
+Driver + truck (limited info)
+Documents (invoice, POD)
+Contact support / fleet
+
+D. History
+
+Past shipments
+Delivery confirmation
+
+RECEIVER DASHBOARD
+
+
+A. Incoming Shipments
+
+Shipment summary
+ETA
+Current location (coarse)
+
+B. Delivery Confirmation
+
+Confirm received
+View POD
+Raise issue
+
+C. History
+Past deliveries
+
+4️⃣ UNION / FLEET SIDE — QUEUE CONTROL (WEB)
+
+This is where power + transparency coexist.
+
+UNION QUEUE MANAGEMENT PAGE
+A. Queue Definition
+
+Union can define queues based on:
+
+Route
+Truck type
+Cargo category
+Priority flags
+Example:
+Queue: Mumbai → Pune | 16T | FMCG
+
+B. Queue View (Ordered List)
+
+Shows:
+
+Driver name
+Truck ID
+Last trip completed
+Queue position
+Status (Available / On Trip / Skipped)
+
+Union can:
+
+Freeze queue
+Reorder (with audit log)
+Remove driver (disciplinary)
+
+C. Job Injection
+
+When shipment arrives:
+Union assigns it to a queue, not a driver
+System starts offering it top-down
+
+5️⃣ RULE ENGINE (THIS IS IMPORTANT)
+
+Queues are not hardcoded logic.
+Union controls rules like:
+Max skips allowed
+Skip penalty (end of queue / temporary block)
+Timeout duration (e.g. 10 minutes)
+Emergency override
+📌 These rules are data-driven, not code-driven.

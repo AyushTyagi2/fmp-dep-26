@@ -1,0 +1,6 @@
+@FmpBackend_HostAddress = http://localhost:5153
+
+GET {{FmpBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

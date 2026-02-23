@@ -1,0 +1,98 @@
+lib/
+├── main.dart                     # App entry point
+├── app.dart                      # App-level setup (theme, router, providers)
+│
+├── config/                       # Environment & build configuration
+│   ├── env.dart                  # API URLs, environment flags
+│   ├── flavor.dart               # dev / staging / prod
+│   └── app_config.dart           # Global app settings
+│
+├── core/                         # App-wide core services
+│   ├── auth/                     # Authentication & session logic
+│   │   ├── auth_service.dart
+│   │   ├── token_manager.dart
+│   │   ├── role_resolver.dart
+│   │   └── auth_guard.dart
+│   │
+│   ├── network/                  # API communication
+│   │   ├── api_client.dart
+│   │   ├── interceptors/
+│   │   └── network_exceptions.dart
+│   │
+│   ├── storage/                  # Local & secure storage
+│   │   ├── secure_storage.dart
+│   │   ├── local_cache.dart
+│   │   └── offline_queue.dart
+│   │
+│   ├── services/                 # Device & platform services
+│   │   ├── notification_service.dart
+│   │   ├── location_service.dart
+│   │   └── connectivity_service.dart
+│   │
+│   ├── constants/                # App-wide constants
+│   └── utils/                    # Helpers, formatters
+│
+├── domain/                       # Business logic (UI-agnostic)
+│   ├── entities/                 # Core business objects
+│   ├── enums/                    # Statuses, roles, states
+│   ├── repositories/             # Repository contracts
+│   └── usecases/                 # Application use cases
+│
+├── data/                         # Data layer implementations
+│   ├── models/                   # API / DB models
+│   ├── datasources/              # Remote & local data sources
+│   ├── repositories/             # Repo implementations
+│   └── mappers/                  # Model ↔ Entity converters
+│
+├── presentation/                 # All UI & state
+│   ├── auth/                     # Authentication screens
+│   │   ├── welcome/
+│   │   ├── phone_input/
+│   │   ├── otp_verify/
+│   │   ├── approval_pending/
+│   │   └── account_restricted/
+│   │
+│   ├── onboarding/               # Role onboarding flows
+│   │   ├── role_selection/
+│   │   ├── driver_onboarding/
+│   │   └── sender_onboarding/
+│   │
+│   ├── role_router/              # Post-login routing
+│   │   ├── role_router_screen.dart
+│   │   └── role_switcher.dart
+│   │
+│   ├── driver/                   # Driver module
+│   │   ├── dashboard/
+│   │   ├── queue/                # Union job queue & offers
+│   │   ├── trips/
+│   │   ├── documents/
+│   │   └── profile/
+│   │
+│   ├── sender/                   # Sender module
+│   │   ├── dashboard/
+│   │   ├── create_shipment/
+│   │   ├── shipments/
+│   │   └── profile/
+│   │
+│   ├── receiver/                 # Receiver module
+│   │   ├── dashboard/
+│   │   ├── incoming_shipments/
+│   │   └── profile/
+│   │
+│   └── common/                   # Reusable UI components
+│       ├── widgets/
+│       ├── dialogs/
+│       ├── loaders/
+│       └── empty_states/
+│
+├── routes/                       # Navigation & routing rules
+│   ├── app_router.dart
+│   ├── auth_routes.dart
+│   ├── driver_routes.dart
+│   ├── sender_routes.dart
+│   └── receiver_routes.dart
+│
+└── shared/                       # Shared resources
+    ├── theme/                    # App theming
+    ├── assets/                   # Images, icons
+    └── localization/             # i18n support
