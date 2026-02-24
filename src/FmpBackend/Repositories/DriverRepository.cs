@@ -17,6 +17,16 @@ public class DriverRepository
         return _db.Drivers.FirstOrDefault(d => d.UserId == userId);
     }
 
+    public Driver? GetById(Guid id)
+    {
+        return _db.Drivers.FirstOrDefault(d => d.Id == id);
+    }
+
+    public IEnumerable<Driver> GetByFleetOwnerId(Guid fleetOwnerId)
+    {
+        return _db.Drivers.Where(d => d.CurrentFleetOwnerId == fleetOwnerId).ToList();
+    }
+
     public Driver Create(Driver driver)
     {
         _db.Drivers.Add(driver);

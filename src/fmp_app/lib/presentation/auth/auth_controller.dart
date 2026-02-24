@@ -67,6 +67,18 @@ class AuthController extends ChangeNotifier {
       case "fleet_onboarding":
         Navigator.pushReplacementNamed(context, '/fleet-onboarding');
         break;
+      default:
+        // Unexpected or unknown screen returned from backend — surface to user
+        final msg = 'Unexpected navigation target: $screen';
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg)),
+          );
+        } catch (_) {
+          // If context no longer mounted or Scaffold not found, just print
+          print(msg);
+        }
+        print('Auth.chooseRole received unexpected screen: $screen');
     }
   } catch (e) {
     _setError("Failed to resolve role");

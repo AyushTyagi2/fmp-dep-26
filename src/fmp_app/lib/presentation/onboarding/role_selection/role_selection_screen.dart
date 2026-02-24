@@ -46,7 +46,7 @@ class RoleSelectionScreen extends StatelessWidget {
               icon: Icons.directions_bus,
               title: "Fleet Owner",
               subtitle: "Manage vehicles & drivers",
-              onTap: () => auth.chooseRole(context,"fleetOwner"),
+              onTap: () => auth.chooseRole(context, "fleet_owner"),
             ),
 
             _RoleButton(

@@ -106,7 +106,6 @@ C:\Dev\startup\FmpBackend\obj\Debug\net8.0\FmpBackend.genruntimeconfig.cache
 C:\Dev\startup\FmpBackend\obj\Debug\net8.0\ref\FmpBackend.dll
 <<<<<<< HEAD
 =======
-E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\appsettings.Development.json
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\appsettings.json
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\FmpBackend.exe
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\FmpBackend.deps.json

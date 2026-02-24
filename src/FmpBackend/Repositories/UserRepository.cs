@@ -18,6 +18,11 @@ public class UserRepository
         return _db.Users.FirstOrDefault(u => u.Phone == phone);
     }
 
+    public User? GetById(Guid id)
+    {
+        return _db.Users.FirstOrDefault(u => u.Id == id);
+    }
+
     public void Create(User user)
     {
         _db.Users.Add(user);

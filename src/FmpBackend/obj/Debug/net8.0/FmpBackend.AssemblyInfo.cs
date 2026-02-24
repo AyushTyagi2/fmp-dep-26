@@ -10,19 +10,11 @@
 using System;
 using System.Reflection;
 
-<<<<<<< HEAD
-[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("5ce695d6-1192-4cde-a549-a5dedcad0329")]
-[assembly: System.Reflection.AssemblyCompanyAttribute("FmpBackend")]
-[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+18d29d3511e1d92e8737696e51dd84d0e56bef72")]
-=======
 [assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("310e0d47-be6f-4acb-ab50-a6af66f9df17")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("FmpBackend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8177900af27be2e4de3082dc767d1f6f251baf45")]
->>>>>>> 2fbf6116185fcdf874d78100b0dc501364644e76
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ff6f7f23444290a15013b91719254587b7e7b48a")]
 [assembly: System.Reflection.AssemblyProductAttribute("FmpBackend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FmpBackend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

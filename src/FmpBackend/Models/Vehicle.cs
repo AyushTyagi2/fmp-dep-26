@@ -8,9 +8,9 @@ public class Vehicle
     public string RegistrationNumber { get; set; } = null!;
     public string VehicleType { get; set; } = null!;
 
-    // NOT NULL IN DB
-    public decimal CapacityTons { get; set; }
-    public decimal MaxLoadWeightKg { get; set; }
+    // These may be null in the DB for some rows — make nullable to avoid cast errors
+    public decimal? CapacityTons { get; set; }
+    public decimal? MaxLoadWeightKg { get; set; }
 
     public string Status { get; set; } = "active";
     public string AvailabilityStatus { get; set; } = "available";

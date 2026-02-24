@@ -12,13 +12,11 @@ public class AppDbContext : DbContext
     public DbSet<Driver> Drivers { get; set; }
     public DbSet<Vehicle> Vehicles { get; set; }
     public DbSet<Organization> Organizations { get; set; }
-<<<<<<< HEAD
       public DbSet<FleetOwner> FleetOwners { get; set; }
 
-=======
     public DbSet<Shipment> Shipments {get; set;}
+      public DbSet<Trip> Trips { get; set; }
     public DbSet<Address> Addresses { get; set; }
->>>>>>> 2fbf6116185fcdf874d78100b0dc501364644e76
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -43,68 +41,72 @@ public class AppDbContext : DbContext
                   .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });*/
     // DRIVERS
-      /*modelBuilder.Entity<Driver>(entity =>
+    modelBuilder.Entity<Driver>(entity =>
+    {
+        entity.ToTable("drivers");
+        entity.HasKey(e => e.Id);
+
+        entity.Property(e => e.Id).HasColumnName("id");
+        entity.Property(e => e.UserId).HasColumnName("user_id");
+        entity.Property(e => e.CurrentFleetOwnerId).HasColumnName("current_fleet_owner_id");
+        entity.Property(e => e.Status).HasColumnName("status");
+
+        entity.Property(e => e.LicenseNumber)
+              .HasColumnName("license_number");
+
+        entity.Property(e => e.LicenseType)
+              .HasColumnName("license_type");
+
+        entity.Property(e => e.LicenseExpiryDate)
+              .HasColumnName("license_expiry_date");
+
+        entity.Property(e => e.AverageRating)
+              .HasColumnName("average_rating");
+
+        entity.Property(e => e.TotalTripsCompleted)
+              .HasColumnName("total_trips_completed");
+
+        entity.Property(e => e.CreatedAt)
+              .HasColumnName("created_at")
+              .HasDefaultValueSql("CURRENT_TIMESTAMP");
+    });
+
+      // TRIPS (minimal mapping)
+      modelBuilder.Entity<Trip>(entity =>
       {
-      entity.ToTable("drivers");
-      entity.HasKey(e => e.Id);
-
-      entity.Property(e => e.Id).HasColumnName("id");
-      entity.Property(e => e.UserId).HasColumnName("user_id");
-      entity.Property(e => e.Status).HasColumnName("status");
-
-      entity.Property(e => e.LicenseNumber)
-            .HasColumnName("license_number");
-
-      entity.Property(e => e.LicenseType)
-            .HasColumnName("license_type");
-
-      entity.Property(e => e.LicenseExpiryDate)
-            .HasColumnName("license_expiry_date");
-
-      entity.Property(e => e.CreatedAt)
-            .HasColumnName("created_at")
-            .HasDefaultValueSql("CURRENT_TIMESTAMP");
-      });*/
+            entity.ToTable("trips");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ShipmentId).HasColumnName("shipment_id");
+            entity.Property(e => e.VehicleId).HasColumnName("vehicle_id");
+            entity.Property(e => e.DriverId).HasColumnName("driver_id");
+            entity.Property(e => e.AssignedFleetOwnerId).HasColumnName("assigned_fleet_owner_id");
+            entity.Property(e => e.CurrentStatus).HasColumnName("current_status");
+            entity.Property(e => e.HasIssues).HasColumnName("has_issues");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+      });
 
 
 // VEHICLES
-      /*modelBuilder.Entity<Vehicle>(entity =>
-      {
-      entity.ToTable("vehicles");
-      entity.HasKey(e => e.Id);
+    modelBuilder.Entity<Vehicle>(entity =>
+    {
+        entity.ToTable("vehicles");
+        entity.HasKey(e => e.Id);
 
-      entity.Property(e => e.Id)
-            .HasColumnName("id");
+        entity.Property(e => e.Id).HasColumnName("id");
+        entity.Property(e => e.RegistrationNumber).HasColumnName("registration_number");
+        entity.Property(e => e.FleetOwnerId).HasColumnName("fleet_owner_id");
+        entity.Property(e => e.VehicleType).HasColumnName("vehicle_type");
+        entity.Property(e => e.CurrentDriverId).HasColumnName("current_driver_id");
 
-      entity.Property(e => e.RegistrationNumber)
-            .HasColumnName("registration_number");
+        entity.Property(e => e.CapacityTons).HasColumnName("capacity_tons");
+        entity.Property(e => e.MaxLoadWeightKg).HasColumnName("max_load_weight_kg");
 
-      entity.Property(e => e.FleetOwnerId)
-            .HasColumnName("fleet_owner_id");
-
-      entity.Property(e => e.VehicleType)
-            .HasColumnName("vehicle_type");
-
-      entity.Property(e => e.CurrentDriverId)
-            .HasColumnName("current_driver_id");
-
-      // REQUIRED NOT NULL FIELDS
-      entity.Property(e => e.CapacityTons)
-            .HasColumnName("capacity_tons");
-
-      entity.Property(e => e.MaxLoadWeightKg)
-            .HasColumnName("max_load_weight_kg");
-
-      // Good to map these too (they also have defaults / constraints)
-      entity.Property(e => e.Status)
-            .HasColumnName("status");
-
-      entity.Property(e => e.AvailabilityStatus)
-            .HasColumnName("availability_status");
-      });*/
+        entity.Property(e => e.Status).HasColumnName("status");
+        entity.Property(e => e.AvailabilityStatus).HasColumnName("availability_status");
+    });
 
 
-<<<<<<< HEAD
 // FLEET OWNERS
 modelBuilder.Entity<FleetOwner>(entity =>
 {
@@ -129,9 +131,7 @@ modelBuilder.Entity<FleetOwner>(entity =>
 
 
  modelBuilder.Entity<Organization>(entity =>
-=======
- /*modelBuilder.Entity<Organization>(entity =>
->>>>>>> 2fbf6116185fcdf874d78100b0dc501364644e76
+//  /*modelBuilder.Entity<Organization>(entity =>
     {
         entity.ToTable("organizations");
         entity.HasKey(e => e.Id);
@@ -162,7 +162,7 @@ modelBuilder.Entity<FleetOwner>(entity =>
         entity.Property(e => e.CreatedAt)
               .HasColumnName("created_at")
               .HasDefaultValueSql("CURRENT_TIMESTAMP");
-    });*/
+    });
 }
     
 }

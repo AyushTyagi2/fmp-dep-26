@@ -28,4 +28,61 @@ public class DriverController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpGet("fleetowners/{id}/drivers")]
+    public IActionResult GetDriversForFleetOwner([FromRoute] Guid id)
+    {
+        try
+        {
+            var list = _driverService.GetDriversForFleetOwner(id);
+            return Ok(list);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("fleetowners/phone/{phone}/drivers")]
+    public IActionResult GetDriversForFleetOwnerByPhone([FromRoute] string phone)
+    {
+        try
+        {
+            var list = _driverService.GetDriversForFleetOwnerByPhone(phone);
+            return Ok(list);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("fleetowners/phone/{phone}/dashboard")]
+    public IActionResult GetDashboardForFleetOwnerByPhone([FromRoute] string phone)
+    {
+        try
+        {
+            var dto = _driverService.GetFleetDashboardByPhone(phone);
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("{id}")]
+    public IActionResult GetDriver([FromRoute] Guid id)
+    {
+        try
+        {
+            var dto = _driverService.GetDriverDetails(id);
+            if (dto == null) return NotFound();
+            return Ok(dto);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }
