@@ -12,13 +12,10 @@ public class AppDbContext : DbContext
     public DbSet<Driver> Drivers { get; set; }
     public DbSet<Vehicle> Vehicles { get; set; }
     public DbSet<Organization> Organizations { get; set; }
-<<<<<<< HEAD
-      public DbSet<FleetOwner> FleetOwners { get; set; }
+    public DbSet<FleetOwner> FleetOwners { get; set; }
 
-=======
     public DbSet<Shipment> Shipments {get; set;}
     public DbSet<Address> Addresses { get; set; }
->>>>>>> 2fbf6116185fcdf874d78100b0dc501364644e76
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -104,7 +101,6 @@ public class AppDbContext : DbContext
       });*/
 
 
-<<<<<<< HEAD
 // FLEET OWNERS
 modelBuilder.Entity<FleetOwner>(entity =>
 {
@@ -128,10 +124,7 @@ modelBuilder.Entity<FleetOwner>(entity =>
 });
 
 
- modelBuilder.Entity<Organization>(entity =>
-=======
  /*modelBuilder.Entity<Organization>(entity =>
->>>>>>> 2fbf6116185fcdf874d78100b0dc501364644e76
     {
         entity.ToTable("organizations");
         entity.HasKey(e => e.Id);
