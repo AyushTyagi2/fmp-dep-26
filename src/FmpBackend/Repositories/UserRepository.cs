@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using FmpBackend.Data;
 using FmpBackend.Models;
 
@@ -27,5 +28,11 @@ public class UserRepository
     {
         _db.Users.Update(user);
         _db.SaveChanges();
+    }
+
+    public async Task<User?> GetByPhoneAsync(string phone)
+    {
+        return await _db.Users
+            .FirstOrDefaultAsync(u => u.Phone == phone);
     }
 }
