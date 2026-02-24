@@ -130,9 +130,8 @@ modelBuilder.Entity<FleetOwner>(entity =>
 });
 
 
- modelBuilder.Entity<Organization>(entity =>
-//  /*modelBuilder.Entity<Organization>(entity =>
-    {
+      modelBuilder.Entity<Organization>(entity =>
+      {
         entity.ToTable("organizations");
         entity.HasKey(e => e.Id);
 
