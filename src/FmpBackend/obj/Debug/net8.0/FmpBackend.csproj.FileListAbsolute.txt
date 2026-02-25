@@ -104,8 +104,6 @@ C:\Dev\startup\FmpBackend\obj\Debug\net8.0\refint\FmpBackend.dll
 C:\Dev\startup\FmpBackend\obj\Debug\net8.0\FmpBackend.pdb
 C:\Dev\startup\FmpBackend\obj\Debug\net8.0\FmpBackend.genruntimeconfig.cache
 C:\Dev\startup\FmpBackend\obj\Debug\net8.0\ref\FmpBackend.dll
-<<<<<<< HEAD
-=======
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\appsettings.json
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\FmpBackend.exe
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\FmpBackend.deps.json
@@ -208,7 +206,6 @@ E:\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\refint\FmpBackend.dll
 E:\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\FmpBackend.pdb
 E:\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\FmpBackend.genruntimeconfig.cache
 E:\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\ref\FmpBackend.dll
->>>>>>> 1a24da6f576d4602ed14a850ee9479c07b8aa10a
 C:\Dev\startup\fmp\src\fmpbackend\obj\Debug\net8.0\FmpBackend.csproj.AssemblyReference.cache
 C:\Dev\startup\fmp\src\fmpbackend\obj\Debug\net8.0\rpswa.dswa.cache.json
 C:\Dev\startup\fmp\src\fmpbackend\obj\Debug\net8.0\FmpBackend.GeneratedMSBuildEditorConfig.editorconfig
