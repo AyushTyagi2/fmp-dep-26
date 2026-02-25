@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Dev\\startup\\fmp\\src\\fmpbackend\\FmpBackend.csproj": {}
+    "C:\\Dev\\startup\\fmp\\src\\FmpBackend\\FmpBackend.csproj": {}
   },
   "projects": {
-    "C:\\Dev\\startup\\fmp\\src\\fmpbackend\\FmpBackend.csproj": {
+    "C:\\Dev\\startup\\fmp\\src\\FmpBackend\\FmpBackend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Dev\\startup\\fmp\\src\\fmpbackend\\FmpBackend.csproj",
+        "projectUniqueName": "C:\\Dev\\startup\\fmp\\src\\FmpBackend\\FmpBackend.csproj",
         "projectName": "FmpBackend",
-        "projectPath": "C:\\Dev\\startup\\fmp\\src\\fmpbackend\\FmpBackend.csproj",
+        "projectPath": "C:\\Dev\\startup\\fmp\\src\\FmpBackend\\FmpBackend.csproj",
         "packagesPath": "C:\\Users\\asus\\.nuget\\packages\\",
-        "outputPath": "C:\\Dev\\startup\\fmp\\src\\fmpbackend\\obj\\",
+        "outputPath": "C:\\Dev\\startup\\fmp\\src\\FmpBackend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\asus\\AppData\\Roaming\\NuGet\\NuGet.Config"
