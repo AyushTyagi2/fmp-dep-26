@@ -9,8 +9,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // 🔹 LOG (correct way)
 Console.WriteLine("We're in the ASP.NET API!!");
 
-// 🔹 Controllers
-builder.Services.AddControllers();
+// 🔹 Controllers (use camelCase JSON for compatibility with frontend)
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 
 // 🔹 Database (PostgreSQL)
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -25,6 +29,7 @@ builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<DriverService>();
 builder.Services.AddScoped<DriverRepository>();
 builder.Services.AddScoped<VehicleRepository>();
+builder.Services.AddScoped<TripRepository>();
 builder.Services.AddScoped<SenderService>();
 builder.Services.AddScoped<OrganizationRepository>();
 builder.Services.AddScoped<FleetOwnerRepository>();

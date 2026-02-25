@@ -1,4 +1,5 @@
 using FmpBackend.Repositories;
+using System.Text.RegularExpressions;
 
 namespace FmpBackend.Services;
 
@@ -26,6 +27,13 @@ public class RoleService
         Console.WriteLine("=== ROLE RESOLUTION ===");
         Console.WriteLine($"Phone: {phone}");
         Console.WriteLine($"Role: {role}");
+
+        // Normalize role input: accept camelCase, kebab-case, snake_case, etc.
+        if (role == null) role = string.Empty;
+        // Convert camelCase to snake_case (e.g., fleetOwner -> fleet_owner)
+        role = Regex.Replace(role, "([a-z0-9])([A-Z])", "$1_$2");
+        // Replace dashes with underscores and lowercase
+        role = role.Replace('-', '_').ToLowerInvariant();
 
         // 1. User must exist (OTP already verified)
         var user = _users.GetByPhone(phone);
