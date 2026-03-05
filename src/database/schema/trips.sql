@@ -93,6 +93,7 @@ CREATE TABLE shipment_queue (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
 CREATE TABLE trips (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     trip_number VARCHAR(50) NOT NULL UNIQUE, -- Human-readable ID: TRP-2024-001234

@@ -63,7 +63,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 title: "Union Admin",
                 subtitle: "Union administration",
                 onTap: () {
-                  Navigator.pushReplacementNamed(context, '/system_admin');
+                  Navigator.pushReplacementNamed(context, '/union-dashboard');
                 },
               ),
           ],
