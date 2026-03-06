@@ -107,5 +107,7 @@ public class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
 
         entity.Property(e => e.CreatedAt)
               .HasColumnName("created_at");
+        entity.Property(entity => entity.ApprovedAt).HasColumnName("approved_at");
+        entity.Property(entity => entity.RejectionReason).HasColumnName("rejection_reason");
     }
 }

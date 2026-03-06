@@ -90,7 +90,7 @@ public class ShipmentService
             UnloadingCharges = request.UnloadingCharges,
             OtherCharges = request.OtherCharges,
 
-            Status = "draft",
+            Status = "pending_approval",
             CreatedAt = DateTime.UtcNow
         };
 
@@ -126,6 +126,53 @@ public class ShipmentService
             s.CreatedAt
         })
     };
+}
+
+    public async Task<List<object>> GetPendingShipmentsAsync()
+    {
+    var shipments = await _ship.GetByStatusAsync("pending_approval");
+
+    return shipments.Select(s => new
+    {
+        s.Id,
+        s.ShipmentNumber,
+        s.CargoType,
+        s.CargoWeightKg,
+        s.Status,
+        s.CreatedAt
+    }).Cast<object>().ToList();
+    }
+    public async Task<bool> ApproveShipmentAsync(Guid shipmentId)
+{
+    var shipment = await _ship.GetByIdAsync(shipmentId);
+
+    if (shipment == null)
+        return false;
+
+    if (shipment.Status != "pending_approval")
+        throw new Exception("Shipment is not pending approval");
+
+    shipment.Status = "approved";
+    shipment.ApprovedAt = DateTime.UtcNow;
+
+    await _ship.UpdateAsync(shipment);
+
+    return true;
+}
+
+    public async Task<bool> RejectShipmentAsync(Guid shipmentId, string reason)
+{
+    var shipment = await _ship.GetByIdAsync(shipmentId);
+
+    if (shipment == null)
+        return false;
+
+    shipment.Status = "rejected";
+    shipment.RejectionReason = reason;
+
+    await _ship.UpdateAsync(shipment);
+
+    return true;
 }
 
 

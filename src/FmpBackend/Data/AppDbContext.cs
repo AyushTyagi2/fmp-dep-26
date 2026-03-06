@@ -17,6 +17,9 @@ public class AppDbContext : DbContext
     public DbSet<Shipment> Shipments {get; set;}
       public DbSet<Trip> Trips { get; set; }
     public DbSet<Address> Addresses { get; set; }
+    public DbSet<QueueEvent> QueueEvents { get; set; }
+
+      public DbSet<DriverQueueEntry> DriverQueueEntries { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
