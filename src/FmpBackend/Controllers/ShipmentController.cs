@@ -43,4 +43,38 @@ public class ShipmentsController : ControllerBase
         var result = await _service.GetShipmentsByPhoneAsync(phone);
         return Ok(result);
     }
+
+    [HttpGet("pending")]
+public async Task<IActionResult> GetPendingShipments()
+{
+    var shipments = await _service.GetPendingShipmentsAsync();
+
+    Console.WriteLine("===== PENDING SHIPMENTS =====");
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(shipments));
+    Console.WriteLine("=============================");
+
+    return Ok(shipments);
+}
+
+    [HttpPost("{id}/approve")]
+    public async Task<IActionResult> ApproveShipment(Guid id)
+    {
+        var result = await _service.ApproveShipmentAsync(id);
+
+        if (!result)
+            return NotFound("Shipment not found or invalid state");
+
+        return Ok(new { message = "Shipment approved" });
+    }
+
+    [HttpPost("{id}/reject")]
+    public async Task<IActionResult> RejectShipment(Guid id)
+    {
+        var result = await _service.RejectShipmentAsync(id, "bad bad");
+
+        if (!result)
+            return NotFound();
+
+        return Ok(new { message = "Shipment rejected" });
+    }
 }

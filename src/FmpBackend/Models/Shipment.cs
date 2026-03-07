@@ -37,7 +37,11 @@ public class Shipment
     public decimal OtherCharges { get; set; }
     public decimal? TotalEstimatedPrice { get; set; }
 
-    public string Status { get; set; } = "draft";
+    public string Status { get; set; } = "pending_approval";
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? ApprovedAt { get; set; } = DateTime.UtcNow;
+
+    public string? RejectionReason { get; set; } = "bad bad product";
 }

@@ -48,4 +48,25 @@ public class ShipmentRepository
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync();
     }
+    public async Task<Shipment?> GetByIdAsync(Guid id)
+    {
+    return await _db.Shipments
+        .FirstOrDefaultAsync(s => s.Id == id);
+    }
+
+    public async Task<List<Shipment>> GetByStatusAsync(string status)
+    {
+    return await _db.Shipments
+        .Where(s => s.Status == status)
+        .OrderByDescending(s => s.CreatedAt)
+        .ToListAsync();
+    }
+
+    public async Task<List<Shipment>> GetApprovedShipmentsAsync()
+    {
+    return await _db.Shipments
+        .Where(s => s.Status == "approved")
+        .OrderByDescending(s => s.CreatedAt)
+        .ToListAsync();
+    }
 }

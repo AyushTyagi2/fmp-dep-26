@@ -4,7 +4,7 @@ import 'package:fmp_app/presentation/auth/phone_input/phone_input_screen.dart';
 import 'package:fmp_app/presentation/auth/otp_verify/otp_verify_screen.dart';
 import 'package:fmp_app/presentation/role_router/account_resolver_screen.dart';
 import 'package:fmp_app/presentation/onboarding/role_selection/role_selection_screen.dart';
-
+import 'package:fmp_app/presentation/union/dashboard/dashboard_union.dart';
 import 'package:fmp_app/presentation/onboarding/sender_onboarding/sender_onboarding_screen.dart';
 import 'package:fmp_app/presentation/onboarding/driver_onboarding/basic_details/driver_basic_details_screen.dart';
 import 'package:fmp_app/presentation/onboarding/fleetmgr_onboarding/fleetmgr_onboarding_screen.dart';
@@ -28,7 +28,9 @@ class AppRouter {
   static const sendrecvDashboard = '/organizationuser';
   static const fleetOnboarding = '/fleet-onboarding';
   static const fleetDashboard = '/fleet-dashboard';
+  static const unionDashboard = '/union-dashboard';
   static const sysadmin = '/system_admin';
+
   static final routes = <String, WidgetBuilder>{
     welcome: (_) => const WelcomeScreen(),
     phone: (_) => const PhoneInputScreen(),
@@ -45,6 +47,7 @@ class AppRouter {
     sendrecvDashboard: (_) => const SenderDashboardScreen(),
     fleetDashboard: (_) => const FleetDashboardScreen(),
 
+    unionDashboard: (_) => const UnionDashboardScreen(),
     sysadmin: (_) => const SysAdminDashboardScreen(),
 
   };

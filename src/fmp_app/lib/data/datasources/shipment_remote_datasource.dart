@@ -15,7 +15,7 @@ class ShipmentRemoteDataSource {
         print("FINAL JSON: $body");
 
     return await dio.post(
-      "/shipments",
+      "/api/shipments",
       data: request.toJson(),
     );
   }
