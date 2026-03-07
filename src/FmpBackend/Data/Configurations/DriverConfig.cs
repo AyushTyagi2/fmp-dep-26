@@ -14,7 +14,6 @@ public class DriverConfig : IEntityTypeConfiguration<Driver>
     entity.Property(e => e.Id).HasColumnName("id");
     entity.Property(e => e.UserId).HasColumnName("user_id");
     entity.Property(e => e.Status).HasColumnName("status");
-
     entity.Property(e => e.LicenseNumber)
           .HasColumnName("license_number");
 
@@ -23,6 +22,21 @@ public class DriverConfig : IEntityTypeConfiguration<Driver>
 
     entity.Property(e => e.LicenseExpiryDate)
           .HasColumnName("license_expiry_date");
+
+    entity.Property(e => e.AvailabilityStatus)
+          .HasColumnName("availability_status");
+
+    entity.Property(e => e.CurrentFleetOwnerId)
+          .HasColumnName("current_fleet_owner_id");
+
+    entity.Property(e => e.Verified)
+          .HasColumnName("verified");
+
+    entity.Property(e => e.AverageRating)
+          .HasColumnName("average_rating");
+
+    entity.Property(e => e.TotalTripsCompleted)
+          .HasColumnName("total_trips_completed");
 
     entity.Property(e => e.CreatedAt)
           .HasColumnName("created_at")
