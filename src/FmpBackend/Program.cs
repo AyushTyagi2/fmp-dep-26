@@ -38,6 +38,7 @@ builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<ShipmentService>();
 builder.Services.AddScoped<ShipmentRepository>();
 builder.Services.AddScoped<AddressRepository>();
+builder.Services.AddScoped<SysAdminService>();
 var app = builder.Build();
 
 // 🔹 Map APIs

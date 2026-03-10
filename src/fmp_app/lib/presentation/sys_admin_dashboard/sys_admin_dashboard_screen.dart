@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/overview_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/users_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/logs_view.dart';
+import 'package:fmp_app/presentation/sys_admin_dashboard/views/queue_view.dart';
+import 'package:fmp_app/presentation/sys_admin_dashboard/views/rules_view.dart';
 
 // This is the MAIN container for the Sys Admin module.
 class SysAdminDashboardScreen extends StatefulWidget {
@@ -19,9 +21,8 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
     const OverviewView(),
     const UsersView(),
     const LogsView(),
-    // Placeholder for Queue/Rules
-    const Center(child: Text("Queue Management Coming Soon")),
-    const Center(child: Text("Rules Engine Coming Soon")),
+    const QueueView(),
+    const RulesView(),
   ];
 
   final List<String> _titles = [
