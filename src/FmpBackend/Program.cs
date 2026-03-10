@@ -15,6 +15,7 @@ builder.Services.AddControllers()
     {
         opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
+    AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 // 🔹 Database (PostgreSQL)
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -38,14 +39,16 @@ builder.Services.AddScoped<RoleService>();
 builder.Services.AddScoped<ShipmentService>();
 builder.Services.AddScoped<ShipmentRepository>();
 builder.Services.AddScoped<AddressRepository>();
-
+builder.Services.AddScoped<ShipmentQueueRepository>();
+builder.Services.AddScoped<ShipmentQueueService>();
+builder.Services.AddScoped<TripCrudRepository>();
+builder.Services.AddScoped<TripService>();
+builder.Services.AddScoped<DriverQueueRepository>();
 
 builder.Services.AddScoped<QueueEventRepository>();
 builder.Services.AddScoped<DriverEligibleRepository>();
-builder.Services.AddScoped<DriverQueueRepository>();
 
 builder.Services.AddScoped<QueueEventService>();
-
 var app = builder.Build();
 
 // 🔹 Map APIs

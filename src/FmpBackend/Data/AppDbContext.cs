@@ -14,8 +14,12 @@ public class AppDbContext : DbContext
     public DbSet<Organization> Organizations { get; set; }
       public DbSet<FleetOwner> FleetOwners { get; set; }
 
-    public DbSet<Shipment> Shipments {get; set;}
-      public DbSet<Trip> Trips { get; set; }
+      public DbSet<Shipment> Shipments { get; set; }
+      public DbSet<Trip>     Trips     { get; set; }
+
+      // ADD THIS LINE:
+      public DbSet<ShipmentQueue> ShipmentQueues { get; set; }
+
     public DbSet<Address> Addresses { get; set; }
     public DbSet<QueueEvent> QueueEvents { get; set; }
 

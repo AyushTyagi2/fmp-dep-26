@@ -1,6 +1,7 @@
 using FmpBackend.Repositories;
 using System.Text.RegularExpressions;
-
+using FmpBackend.Models;
+using FmpBackend.Dtos;
 namespace FmpBackend.Services;
 
 public class QueueEventService

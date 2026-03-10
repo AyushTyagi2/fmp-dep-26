@@ -18,7 +18,6 @@ class MyApp extends StatelessWidget {
          ChangeNotifierProvider<AuthController>(
           create: (context) => AuthController(context.read<AuthApi>()),
         ),
-        Provider(create: (_) => DriverState()),
         ChangeNotifierProvider<FleetState>(
           create: (_) => FleetState(),
         ),

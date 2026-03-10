@@ -40,4 +40,12 @@ public class UserRepository
         return await _db.Users
             .FirstOrDefaultAsync(u => u.Phone == phone);
     }
+
+    public Guid? GetIdByPhone(string phone)
+{
+    return _db.Users
+        .Where(u => u.Phone == phone)
+        .Select(u => (Guid?)u.Id)
+        .FirstOrDefault();
+}
 }

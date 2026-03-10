@@ -1,81 +1,366 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../driver_state.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_trips.dart';
+import '../../../app_session.dart';
 
-class DriverHomeScreen extends StatelessWidget {
+/// Full delivery lifecycle screen — navigated to after accepting a shipment
+class ActiveTripScreen extends StatefulWidget {
+  final String tripId;
+  const ActiveTripScreen({super.key, required this.tripId});
+
+  @override
+  State<ActiveTripScreen> createState() => _ActiveTripScreenState();
+}
+
+class _ActiveTripScreenState extends State<ActiveTripScreen> {
+  late final TripApiService _api;
+  TripSummary? _trip;
+  bool _loading  = true;
+  bool _updating = false;
+  String? _error;
+
+  static const _steps = ['assigned', 'in_transit', 'delivered'];
+  static const _stepLabels = {
+    'assigned':   'Start Delivery',
+    'in_transit': 'Mark as Delivered',
+    'delivered':  'Completed ✓',
+  };
+  static const _stepDescriptions = {
+    'assigned':   'Shipment assigned to you. Head to pickup location.',
+    'in_transit': 'Cargo picked up. En route to delivery.',
+    'delivered':  'Delivery complete!',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _api = TripApiService(ApiClient());
+    _loadTrip();
+  }
+
+  Future<void> _loadTrip() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final trip = await _api.getTripById(widget.tripId);
+      if (!mounted) return;
+      setState(() { _trip = trip; _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _advanceStatus() async {
+    if (_trip == null) return;
+    final idx = _steps.indexOf(_trip!.currentStatus);
+    if (idx < 0 || idx >= _steps.length - 1) return;
+
+    final nextStatus = _steps[idx + 1];
+    setState(() => _updating = true);
+
+    final ok = await _api.updateStatus(widget.tripId, nextStatus);
+    if (!mounted) return;
+
+    if (ok) {
+      setState(() {
+        _trip = TripSummary(
+          id: _trip!.id, tripNumber: _trip!.tripNumber,
+          shipmentId: _trip!.shipmentId, shipmentNumber: _trip!.shipmentNumber,
+          currentStatus: nextStatus, agreedPrice: _trip!.agreedPrice,
+          createdAt: _trip!.createdAt,
+        );
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update status. Please retry.'), backgroundColor: Colors.red),
+      );
+    }
+    setState(() => _updating = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Active Trip'),
+        backgroundColor: const Color(0xFF1B3A6B),
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null ? _buildError() : _buildContent(),
+    );
+  }
+
+  Widget _buildError() => Center(
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+      const SizedBox(height: 12),
+      Text(_error!, textAlign: TextAlign.center),
+      const SizedBox(height: 16),
+      ElevatedButton(onPressed: _loadTrip, child: const Text('Retry')),
+    ]),
+  );
+
+  Widget _buildContent() {
+    final trip   = _trip!;
+    final status = trip.currentStatus;
+    final isDone = status == 'delivered';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _StatusStepper(currentStatus: status, steps: _steps),
+        const SizedBox(height: 24),
+        Container(
+          width: double.infinity, padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDone ? const Color(0xFF4CAF50).withOpacity(0.1) : const Color(0xFF1B3A6B).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDone ? const Color(0xFF4CAF50).withOpacity(0.4) : const Color(0xFF1B3A6B).withOpacity(0.15)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(trip.tripNumber, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+            const SizedBox(height: 4),
+            Text(_stepDescriptions[status] ?? status,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          ]),
+        ),
+        const SizedBox(height: 20),
+        if (trip.agreedPrice != null)
+          _InfoCard(children: [
+            _InfoRow(label: 'Shipment #', value: trip.shipmentNumber),
+            _InfoRow(label: 'Payout',     value: '₹${trip.agreedPrice!.toStringAsFixed(0)}'),
+          ]),
+        const SizedBox(height: 32),
+        if (!isDone)
+          SizedBox(
+            width: double.infinity, height: 54,
+            child: ElevatedButton(
+              onPressed: _updating ? null : _advanceStatus,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B3A6B), foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _updating
+                  ? const SizedBox(width: 24, height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(_stepLabels[status] ?? 'Update Status',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ),
+          )
+        else
+          Column(children: [
+            Container(
+              width: double.infinity, padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.1), borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.4)),
+              ),
+              child: const Column(children: [
+                Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 48),
+                SizedBox(height: 8),
+                Text('Delivery Complete!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50))),
+                SizedBox(height: 4),
+                Text('Great work! Payment will be processed shortly.',
+                    style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity, height: 54,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: const Text('Back to Dashboard', style: TextStyle(fontSize: 16)),
+              ),
+            ),
+          ]),
+      ]),
+    );
+  }
+}
+
+/// Home tab — shows active trip or empty state
+class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
 
-  String _buttonText(TripStatus status) {
-    switch (status) {
-      case TripStatus.assigned:
-        return 'Start Trip';
-      case TripStatus.started:
-        return 'Reached Pickup';
-      case TripStatus.reachedPickup:
-        return 'Load Cargo';
-      case TripStatus.loaded:
-        return 'Start Delivery';
-      case TripStatus.inTransit:
-        return 'Mark Delivered';
-      case TripStatus.delivered:
-        return 'Finish';
+  @override
+  State<DriverHomeScreen> createState() => _DriverHomeScreenState();
+}
+
+class _DriverHomeScreenState extends State<DriverHomeScreen> {
+  late final TripApiService _api;
+  List<TripSummary> _activeTrips = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = TripApiService(ApiClient());
+    _loadActiveTrips();
+  }
+
+  Future<void> _loadActiveTrips() async {
+    final driverId = AppSession.driverId;
+    if (driverId == null) { setState(() => _loading = false); return; }
+    try {
+      final all = await _api.getDriverTrips(driverId);
+      if (!mounted) return;
+      setState(() {
+        _activeTrips = all.where((t) => t.currentStatus != 'delivered').toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final driverState = context.watch<DriverState>();
+    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    if (!driverState.hasActiveTrip) {
-      return const Scaffold(
+    if (_activeTrips.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('My Dashboard'), backgroundColor: const Color(0xFF1B3A6B), foregroundColor: Colors.white),
         body: Center(
-          child: Text(
-            'No active trip assigned',
-            style: TextStyle(fontSize: 18),
-          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.local_shipping_outlined, size: 72, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text('No active trips', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey)),
+            const SizedBox(height: 8),
+            const Text('Browse the Queue tab to accept a shipment', style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadActiveTrips,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B3A6B), foregroundColor: Colors.white),
+            ),
+          ]),
         ),
       );
     }
 
-    final trip = driverState.activeTrip!;
-
+    final trip = _activeTrips.first;
     return Scaffold(
-      appBar: AppBar(title: const Text('Active Trip')),
+      appBar: AppBar(title: const Text('My Dashboard'), backgroundColor: const Color(0xFF1B3A6B), foregroundColor: Colors.white),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  trip.route,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text('Pickup: ${trip.pickupTime}'),
-                const SizedBox(height: 8),
-                Text('Status: ${trip.status.name}'),
-                const SizedBox(height: 24),
-
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('ACTIVE TRIP', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const SizedBox(height: 8),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(trip.tripNumber, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(trip.shipmentNumber, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                _StatusChip(status: trip.currentStatus),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      driverState.advanceStatus();
-                    },
-                    child: Text(_buttonText(trip.status)),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ActiveTripScreen(tripId: trip.id)),
+                    ).then((_) => _loadActiveTrips()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1B3A6B), foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Manage Trip'),
                   ),
                 ),
-              ],
+              ]),
             ),
           ),
-        ),
+        ]),
       ),
     );
   }
+}
+
+// ── Supporting widgets ────────────────────────────────────────────────────────
+
+class _StatusStepper extends StatelessWidget {
+  final String currentStatus;
+  final List<String> steps;
+  const _StatusStepper({required this.currentStatus, required this.steps});
+
+  @override
+  Widget build(BuildContext context) {
+    final idx = steps.indexOf(currentStatus);
+    return Row(
+      children: List.generate(steps.length * 2 - 1, (i) {
+        if (i.isOdd) {
+          final done = (i ~/ 2) < idx;
+          return Expanded(child: Container(height: 2, color: done ? const Color(0xFF4CAF50) : Colors.grey.shade300));
+        }
+        final stepIdx = i ~/ 2;
+        final done    = stepIdx <= idx;
+        return Container(
+          width: 28, height: 28,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? const Color(0xFF4CAF50) : Colors.grey.shade300),
+          child: done
+              ? const Icon(Icons.check, color: Colors.white, size: 16)
+              : Text('${stepIdx + 1}', textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        );
+      }),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip({required this.status});
+
+  Color get _color => switch (status) {
+    'assigned'   => const Color(0xFFFF9800),
+    'in_transit' => const Color(0xFF9C27B0),
+    'delivered'  => const Color(0xFF4CAF50),
+    _            => Colors.grey,
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(color: _color.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: _color.withOpacity(0.4))),
+    child: Text(status.replaceAll('_', ' ').toUpperCase(), style: TextStyle(color: _color, fontWeight: FontWeight.w600, fontSize: 11)),
+  );
+}
+
+class _InfoCard extends StatelessWidget {
+  final List<Widget> children;
+  const _InfoCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity, padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white, borderRadius: BorderRadius.circular(12),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
+    ),
+    child: Column(children: children),
+  );
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label; final String value;
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(children: [
+      SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13))),
+      Expanded(child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+    ]),
+  );
 }

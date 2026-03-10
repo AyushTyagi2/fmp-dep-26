@@ -5,7 +5,9 @@ import '../union_profile/profile.dart';
 import '../union_home/home.dart';
 
 class UnionDashboardScreen extends StatefulWidget {
-  const UnionDashboardScreen({super.key});
+  final String driverId;
+
+  const UnionDashboardScreen({super.key, required this.driverId});
 
   @override
   State<UnionDashboardScreen> createState() => _UnionDashboardScreenState();
@@ -14,9 +16,9 @@ class UnionDashboardScreen extends StatefulWidget {
 class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
   int _index = 0;
 
-  final _pages = const [
+  late final _pages = [
     UnionHomeScreen(),
-    UnionQueueScreen(),
+    QueueScreen(driverId: widget.driverId),
     UnionRequestScreen(),
     UnionProfileScreen(),
   ];
@@ -30,9 +32,8 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
         onTap: (i) => setState(() => _index = i),
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Queue'),
-          // BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Trips'),
+          BottomNavigationBarItem(icon: Icon(Icons.home),   label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.list),   label: 'Queue'),
           BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Requests'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
