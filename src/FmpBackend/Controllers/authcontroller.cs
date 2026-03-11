@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using FmpBackend.Services;
 using FmpBackend.Dtos;
+using FmpBackend.Repositories;
 
 namespace FmpBackend.Controllers;
 
@@ -8,13 +9,24 @@ namespace FmpBackend.Controllers;
 [Route("auth")]
 public class AuthController : ControllerBase
 {
-    private readonly OtpService _otpService;
-    private readonly RoleService _roleService;
+    private readonly OtpService    _otpService;
+    private readonly RoleService   _roleService;
+    private readonly JwtService    _jwtService;
+    private readonly DriverRepository _drivers;
+    private readonly UserRepository   _users;
 
-    public AuthController(OtpService otpService, RoleService roleService)
+    public AuthController(
+        OtpService otpService,
+        RoleService roleService,
+        JwtService jwtService,
+        DriverRepository drivers,
+        UserRepository users)
     {
-        _otpService = otpService;
+        _otpService  = otpService;
         _roleService = roleService;
+        _jwtService  = jwtService;
+        _drivers     = drivers;
+        _users       = users;
     }
 
     [HttpPost("request-otp")]
@@ -38,12 +50,21 @@ public class AuthController : ControllerBase
         }
     }
 
-    // NEW
     [HttpPost("resolve-role")]
     public IActionResult ResolveRole([FromBody] ResolveRoleDto dto)
     {
         var screen = _roleService.Resolve(dto.Phone, dto.Role);
-        Console.WriteLine($"screen does exist: {screen}");
-        return Ok(new { screen });
+        var token  = _jwtService.Generate(dto.Phone, dto.Role);
+
+        // Look up driverId if this is a driver
+        string? driverId = null;
+        var user = _users.GetByPhone(dto.Phone);
+        if (user != null)
+        {
+            var driver = _drivers.GetByUserId(user.Id);
+            driverId = driver?.Id.ToString();
+        }
+
+        return Ok(new { screen, token, driverId });
     }
 }

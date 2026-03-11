@@ -4,19 +4,30 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-     <AssemblyName>FmpBackend</AssemblyName>
+    <AssemblyName>FmpBackend</AssemblyName>
     <UserSecretsId>310e0d47-be6f-4acb-ab50-a6af66f9df17</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
-  <PackageReference Include="Microsoft.AspNetCore.App" Version="2.2.8" />
-  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.2" />
-  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.2" />
-  <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.2">
-    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    <PrivateAssets>all</PrivateAssets>
-  </PackageReference>
-  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
-</ItemGroup>
+    <!-- ✅ REMOVED: Microsoft.AspNetCore.App — causes NETSDK1080 warning and is wrong for net8.0 -->
+    <!-- net8.0 + Microsoft.NET.Sdk.Web already includes the full ASP.NET Core shared framework -->
+
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.2" />
+
+    <!-- EF Core -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
+
+    <!-- ✅ NEW: JWT authentication -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.2" />
+
+    <!-- ✅ NEW: JWT token creation/validation -->
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.5.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.2" />
+  </ItemGroup>
 
 </Project>

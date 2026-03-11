@@ -1,27 +1,63 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using FmpBackend.Data;
 using FmpBackend.Repositories;
 using FmpBackend.Services;
+using FmpBackend.Workers;
+using FmpBackend.Middleware;
+using System.Reflection.Metadata;
+using System.Collections;
+using Microsoft.VisualBasic;
+using System.Net.Security;
+
+
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Jwt:Key is not configured in appsettings.json");
+
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-// 🔹 LOG (correct way)
-Console.WriteLine("We're in the ASP.NET API!!");
 
-// 🔹 Controllers (use camelCase JSON for compatibility with frontend)
-builder.Services.AddControllers()
-    .AddJsonOptions(opts =>
+
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateIssuer           = false,
+            ValidateAudience         = false,
+            ClockSkew                = TimeSpan.Zero
+        };
     });
 
-// 🔹 Database (PostgreSQL)
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    )
-);
+builder.Services.AddAuthorization();
+
+// ✅ NEW: SignalR for real-time queue updates (replaces 5-second polling)
+builder.Services.AddSignalR();
+
+// Controllers with camelCase JSON
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+        opts.JsonSerializerOptions.PropertyNamingPolicy =
+            System.Text.Json.JsonNamingPolicy.CamelCase);
+
+// ✅ NEW: CORS — allow Flutter app origin
+builder.Services.AddCors(options =>
+    options.AddPolicy("AllowFlutter", policy =>
+        policy.WithOrigins("http://localhost:*")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials()));
+
 
 // 🔹 Dependency Injection
 builder.Services.AddScoped<OtpService>();
@@ -42,14 +78,25 @@ builder.Services.AddScoped<AddressRepository>();
 
 builder.Services.AddScoped<QueueEventRepository>();
 builder.Services.AddScoped<DriverEligibleRepository>();
-builder.Services.AddScoped<DriverQueueRepository>();
-
+builder.Services.AddScoped<SysAdminService>();
 builder.Services.AddScoped<QueueEventService>();
+builder.Services.AddSingleton<JwtService>();
+builder.Services.AddHostedService<QueueMaintenanceWorker>();
+
 
 var app = builder.Build();
 
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+app.UseCors("AllowFlutter");
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
 // 🔹 Map APIs
 app.MapControllers();
+app.MapHub<ShipmentQueueHub>("/hubs/shipment-queue");
 
 // 🔹 Start server
 app.Run();

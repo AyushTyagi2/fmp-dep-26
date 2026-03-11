@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'app_session.dart';
 import 'app.dart';
-void main() {
-  print("APP STARTED");
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppSession.restore();
   runApp(const MyApp());
 }
-
