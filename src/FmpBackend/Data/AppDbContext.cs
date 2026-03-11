@@ -19,7 +19,7 @@ public class AppDbContext : DbContext
 
       // ADD THIS LINE:
       public DbSet<ShipmentQueue> ShipmentQueues { get; set; }
-
+      public DbSet<ShipmentQueueAssignment> ShipmentQueueAssignments  { get; set; }  // ← NEW
     public DbSet<Address> Addresses { get; set; }
     public DbSet<QueueEvent> QueueEvents { get; set; }
 

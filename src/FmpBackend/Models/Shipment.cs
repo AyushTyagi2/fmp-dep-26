@@ -34,9 +34,6 @@ public class Shipment
     public decimal UnloadingCharges { get; set; }
     public decimal OtherCharges { get; set; }
     public decimal? TotalEstimatedPrice { get; set; }
-
-    public string Status { get; set; } = "pending_approval";
-
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
     public string? RejectionReason { get; set; }
@@ -44,4 +41,7 @@ public class Shipment
     // ✅ Navigation properties for address resolution in queue DTO
     public Address? PickupAddress { get; set; }
     public Address? DropAddress { get; set; }
+
+    public string Status { get; set; } = "pending_approval";
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

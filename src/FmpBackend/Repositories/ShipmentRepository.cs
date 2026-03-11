@@ -28,6 +28,7 @@ public class ShipmentRepository
 
     public async Task UpdateAsync(Shipment shipment)
     {
+        shipment.UpdatedAt = DateTime.UtcNow;
         _db.Shipments.Update(shipment);
         await _db.SaveChangesAsync();
     }
@@ -69,4 +70,15 @@ public class ShipmentRepository
         .OrderByDescending(s => s.CreatedAt)
         .ToListAsync();
     }
+
+    public async Task UpdateStatusAsync(Guid shipmentId, string status)
+{
+    var shipment = await _db.Shipments.FindAsync(shipmentId);
+    if (shipment == null) return;
+
+    shipment.Status = status;
+    shipment.UpdatedAt = DateTime.UtcNow;
+
+    await _db.SaveChangesAsync();
+}
 }

@@ -41,6 +41,12 @@ class AuthController extends ChangeNotifier {
   Future<void> chooseRole(BuildContext context, String role) async {
   try {
     final res = await _authApi.resolveRole(phone!, role);
+    // ✅ Save session HERE before navigating
+    await AppSession.save(
+      phone:    phone!,
+      token:    res['token']    as String,
+      driverId: res['driverId'] as String?,
+    );
     final screen = res["screen"];
 
     switch (screen) {
@@ -133,11 +139,6 @@ class AuthController extends ChangeNotifier {
       
     } catch(e){
       _setError("Incorrect or expired Otp!");
-    }
-
-    if (otp != '123456') {
-      _setError('Incorrect OTP');
-      return;
     }
 
 

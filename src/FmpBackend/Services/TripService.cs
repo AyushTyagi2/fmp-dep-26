@@ -7,12 +7,12 @@ namespace FmpBackend.Services;
 public class TripService
 {
     private readonly TripCrudRepository _repo;
-    private readonly ShipmentService _shipmentService;
+    private readonly ShipmentRepository _shipmentRepo;
 
-    public TripService(TripCrudRepository repo, ShipmentService shipmentService)
+    public TripService(TripCrudRepository repo, ShipmentRepository shipmentRepo)
     {
         _repo = repo;
-        _shipmentService = shipmentService;
+        _shipmentRepo = shipmentRepo;
     }
 
     public async Task<PagedResult<TripDto>> GetAllAsync(int page, int pageSize, string? status)
@@ -59,7 +59,7 @@ public class TripService
         await _repo.AddAsync(trip);
 
         // ✅ Sync shipment status → "assigned"
-        await _shipmentService.SyncStatusFromTripAsync(req.ShipmentId, "assigned");
+        await _shipmentRepo.UpdateStatusAsync(req.ShipmentId, "assigned");
 
         return (await GetByIdAsync(trip.Id))!;
     }
@@ -99,7 +99,7 @@ public class TripService
         await _repo.SaveAsync();
 
         // ✅ Sync shipment status whenever trip moves forward
-        await _shipmentService.SyncStatusFromTripAsync(trip.ShipmentId, req.Status);
+        await _shipmentRepo.UpdateStatusAsync(trip.ShipmentId, req.Status);
 
         return true;
     }

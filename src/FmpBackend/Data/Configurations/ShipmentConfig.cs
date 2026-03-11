@@ -41,7 +41,7 @@ public class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
         entity.Property(e => e.CreatedAt).HasColumnName("created_at");
         entity.Property(e => e.ApprovedAt).HasColumnName("approved_at");
         entity.Property(e => e.RejectionReason).HasColumnName("rejection_reason");
-
+        entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
         // ✅ Navigation — lets ShipmentQueueService resolve city names
         entity.HasOne(e => e.PickupAddress)
               .WithMany()

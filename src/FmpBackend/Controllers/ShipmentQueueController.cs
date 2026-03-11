@@ -32,16 +32,16 @@ public class ShipmentQueueController : ControllerBase
     }
 
     // ✅ Now returns { success, tripId } so Flutter can navigate to active trip
-    [HttpPost("{id:guid}/accept")]
-    public async Task<IActionResult> Accept(Guid id, [FromBody] AcceptQueueItemRequest req)
-    {
-        var tripId = await _svc.AcceptAsync(id, req.DriverId);
+   [HttpPost("{id:guid}/accept")]
+public async Task<IActionResult> Accept(Guid id, [FromBody] AcceptQueueItemRequest req)
+{
+    var result = await _svc.AcceptAsync(id, req.DriverId);
 
-        if (tripId == null)
-            return Conflict(new AcceptQueueItemResponse(false, null, "Already taken by another driver."));
+    if (result.error != null)
+        return Conflict(new AcceptQueueItemResponse(false, null, result.error));
 
-        return Ok(new AcceptQueueItemResponse(true, tripId, "Shipment accepted."));
-    }
+    return Ok(new AcceptQueueItemResponse(true, result.tripId, "Shipment accepted."));
+}
 }
 
 public record EnqueueRequest(Guid ShipmentId, string? RequiredVehicleType, Guid? ZoneId);

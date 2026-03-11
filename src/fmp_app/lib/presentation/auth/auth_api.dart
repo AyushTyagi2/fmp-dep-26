@@ -20,15 +20,10 @@ class AuthApi {
     );
   }
 
-  Future<void> verifyOtp(String phone, String otp) async {
-    await _dio.post(
-      "/auth/verify-otp",
-      data: {
-        "phone": phone,
-        "otp": otp,
-      },
-    );
-  }
+  Future<Map<String, dynamic>> verifyOtp(String phone, String otp) async {
+  final res = await _dio.post("/auth/verify-otp", data: {"phone": phone, "otp": otp});
+  return Map<String, dynamic>.from(res.data); // ✅ return the response
+}
 
     Future<void> submitDriverDetails({
     required String phone,

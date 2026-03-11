@@ -3,6 +3,7 @@ import '../../../core/models/shipment.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_shipment_queue.dart';
 import '../home/driver_home_screen.dart';
+import '../../../app_session.dart';
 
 class DriverShipmentDetailScreen extends StatefulWidget {
   final Shipment shipment;
@@ -30,6 +31,12 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
   }
 
   Future<void> _handleAccept() async {
+    debugPrint('=== SESSION DEBUG ===');
+    debugPrint('driverId: ${AppSession.driverId}');
+    debugPrint('token: ${AppSession.token}');
+    debugPrint('phone: ${AppSession.phone}');
+    debugPrint('====================');
+
     if (widget.driverId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Session error: driver ID not found. Please re-login.')),
@@ -41,8 +48,8 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
 
     try {
       final result = await _api.acceptShipment(
-        shipmentId: widget.shipment.id,
-        driverId:   widget.driverId,
+        shipmentQueueId: widget.shipment.id,   // ← renamed parameter
+        driverId:        widget.driverId,
       );
 
       if (!mounted) return;
@@ -59,7 +66,6 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
         await Future.delayed(const Duration(milliseconds: 600));
         if (!mounted) return;
 
-        // ✅ Navigate to active trip, clearing the queue stack
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
@@ -68,7 +74,13 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
           (route) => route.isFirst,
         );
       } else {
-        _showAlreadyTakenDialog();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? 'Unknown error'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 10),
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -89,7 +101,8 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
           SizedBox(width: 8),
           Text('Already Taken'),
         ]),
-        content: const Text('Another driver just accepted this shipment. Go back to the queue to find another one.'),
+        content: const Text(
+            'Another driver just accepted this shipment. Go back to the queue to find another one.'),
         actions: [
           ElevatedButton(
             onPressed: () { Navigator.pop(context); Navigator.pop(context); },
@@ -132,8 +145,10 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
                   const SizedBox(height: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.red.shade400, borderRadius: BorderRadius.circular(12)),
-                    child: const Text('⚡ URGENT', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    decoration: BoxDecoration(
+                        color: Colors.red.shade400, borderRadius: BorderRadius.circular(12)),
+                    child: const Text('⚡ URGENT',
+                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ]),

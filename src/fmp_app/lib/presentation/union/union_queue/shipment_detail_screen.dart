@@ -17,12 +17,6 @@ class ShipmentDetailScreen extends StatefulWidget {
   State<ShipmentDetailScreen> createState() => _ShipmentDetailScreenState();
 }
 
-//s.price  →  s.agreedPrice
-//s.pickupLocation  →  s.pickupAddressId
-//s.dropLocation  →  s.dropAddressId
-//s.weightKg  →  s.cargoWeightKg
-
-
 class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
   late final ShipmentApiService _api;
   bool _isAccepting = false;
@@ -39,14 +33,13 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
 
     try {
       final result = await _api.acceptShipment(
-        shipmentId: widget.shipment.id,
-        driverId:   widget.driverId,
+        shipmentQueueId: widget.shipment.id,   // ← renamed parameter
+        driverId:        widget.driverId,
       );
-      final success = result.success;
 
       if (!mounted) return;
 
-      if (success) {
+      if (result.success) {
         setState(() => _accepted = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -92,8 +85,8 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
         actions: [
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // close dialog
-              Navigator.pop(context); // back to queue
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
             child: const Text('Back to Queue'),
           ),
@@ -132,16 +125,15 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
                     const Text('Payout',
                         style: TextStyle(color: Colors.white70, fontSize: 14)),
                     Text(
-                      '\$${s.agreedPrice!.toStringAsFixed(2)}',
+                      '₹${s.agreedPrice!.toStringAsFixed(0)}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (s.cargoWeightKg != null)
-                      Text('${s.cargoWeightKg} kg',
-                          style: const TextStyle(color: Colors.white70)),
+                    Text('${s.cargoWeightKg.toStringAsFixed(1)} kg',
+                        style: const TextStyle(color: Colors.white70)),
                   ],
                 ),
               ),
@@ -156,7 +148,7 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
                     icon:  Icons.circle,
                     color: const Color(0xFF4CAF50),
                     label: 'Pickup',
-              value: s.pickupLocation,
+                    value: s.pickupLocation,
                   ),
                   const Padding(
                     padding: EdgeInsets.only(left: 12),
@@ -184,13 +176,12 @@ class _ShipmentDetailScreenState extends State<ShipmentDetailScreen> {
               title: 'Details',
               child: Column(
                 children: [
-                  _InfoRow(label: 'Shipment ID', value: s.id),
-                  _InfoRow(label: 'Status',      value: s.status),
-                  if (s.cargoWeightKg != null)
-                    _InfoRow(label: 'Weight', value: '${s.cargoWeightKg} kg'),
+                  _InfoRow(label: 'Shipment #', value: s.shipmentNumber),
+                  _InfoRow(label: 'Status',     value: s.status),
+                  _InfoRow(label: 'Weight',     value: '${s.cargoWeightKg.toStringAsFixed(1)} kg'),
                   if (s.agreedPrice != null)
                     _InfoRow(label: 'Price',
-                        value: '\$${s.agreedPrice!.toStringAsFixed(2)}'),
+                        value: '₹${s.agreedPrice!.toStringAsFixed(0)}'),
                   _InfoRow(
                     label: 'Posted',
                     value: s.createdAt.toLocal().toString().substring(0, 16),

@@ -1,3 +1,4 @@
+using FmpBackend.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,5 +18,20 @@ public class DriverQueueEntryConfiguration : IEntityTypeConfiguration<DriverQueu
         builder.Property(e => e.ClaimWindowStart).HasColumnName("claim_window_start");
         builder.Property(e => e.ClaimWindowEnd).HasColumnName("claim_window_end");
         builder.Property(e => e.HasClaimed).HasColumnName("has_claimed").HasDefaultValue(false);
+
+        // ── Parallel offer columns ──────────────────────────────────────────
+        builder.Property(e => e.CurrentOfferedShipmentQueueId)
+               .HasColumnName("current_offered_shipment_queue_id");
+
+        builder.Property(e => e.OfferStatus)
+               .HasColumnName("offer_status")
+               .HasMaxLength(20)
+               .HasDefaultValue(DriverOfferStatus.Idle);
+
+        builder.HasOne(e => e.CurrentOfferedShipment)
+               .WithMany()
+               .HasForeignKey(e => e.CurrentOfferedShipmentQueueId)
+               .IsRequired(false)
+               .OnDelete(DeleteBehavior.SetNull);
     }
 }
