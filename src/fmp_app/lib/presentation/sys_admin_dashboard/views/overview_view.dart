@@ -6,47 +6,70 @@ class OverviewView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: const [
-                // Mock Stats
-                _StatCard(title: "Users", value: "7,842", icon: Icons.people, color: Colors.blue),
-                _StatCard(title: "Drivers", value: "1,204", icon: Icons.drive_eta, color: Colors.green),
-                _StatCard(title: "Active Jobs", value: "154", icon: Icons.local_shipping, color: Colors.orange),
-                _StatCard(title: "Alerts", value: "3", icon: Icons.warning, color: Colors.red),
-              ],
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: const [
+              _StatCard(title: "Total Users", value: "7,842", icon: Icons.people_alt, color: Colors.blue),
+              _StatCard(title: "Active Drivers", value: "1,204", icon: Icons.local_taxi, color: Colors.green),
+              _StatCard(title: "Ongoing Jobs", value: "154", icon: Icons.route, color: Colors.purple),
+              _StatCard(title: "System Alerts", value: "3", icon: Icons.warning_amber, color: Colors.red),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Recent System Activity",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              TextButton(onPressed: () {}, child: const Text("View All"))
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 10,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final isWarning = index == 2 || index == 7;
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isWarning ? Colors.orange.shade50 : Colors.blue.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isWarning ? Icons.priority_high : Icons.info_outline, 
+                      size: 20, 
+                      color: isWarning ? Colors.orange : Colors.blue
+                    ),
+                  ),
+                  title: Text(
+                    isWarning ? "High Memory Usage Detected on Node $index" : "User ID ${45 + index} updated their profile",
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text("${index + 2} minutes ago", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                );
+              },
             ),
           ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              "Recent System Activity",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 10,
-            itemBuilder: (context, index) {
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.blueGrey.withOpacity(0.1),
-                  child: const Icon(Icons.info_outline, size: 16),
-                ),
-                title: Text("System Event #${1000 + index}"),
-                subtitle: Text("User ID 45 updated profile • 2 min ago"),
-                trailing: const Icon(Icons.chevron_right),
-              );
-            },
-          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -63,7 +86,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Determine width based on available space (roughly 2 cards per row on mobile)
+    // Width for roughly 2 cards per row on mobile
     final width = (MediaQuery.of(context).size.width - 48) / 2;
 
     return Container(
@@ -71,18 +94,27 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: BorderSide(color: Colors.grey.shade200),
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(title, style: TextStyle(color: Colors.grey[600])),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 16),
+          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)),
+          const SizedBox(height: 4),
+          Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
     );

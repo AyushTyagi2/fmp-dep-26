@@ -5,25 +5,174 @@ class LogsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: 50,
-      itemBuilder: (context, index) {
-        final isError = index % 5 == 0;
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          color: isError ? Colors.red[50] : Colors.white,
-          child: ListTile(
-            leading: Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: isError ? Colors.red : Colors.green,
-            ),
-            title: Text(isError ? "Connection Timeout" : "User Login Success"),
-            subtitle: Text("2024-02-17 15:3$index • Server 1"),
-            trailing: const Icon(Icons.more_vert),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          color: Colors.white,
+          child: Row(
+            children: [
+              _FilterChip(label: "All Logs", isSelected: true),
+              const SizedBox(width: 8),
+              _FilterChip(label: "Errors", isSelected: false),
+              const SizedBox(width: 8),
+              _FilterChip(label: "Warnings", isSelected: false),
+              const Spacer(),
+              TextButton.icon(
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text("Export"),
+                style: TextButton.styleFrom(foregroundColor: Colors.indigo),
+                onPressed: () {},
+              )
+            ],
           ),
-        );
-      },
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 50,
+            itemBuilder: (context, index) {
+              final isError = index % 7 == 0;
+              final isWarning = index % 5 == 0 && !isError;
+              
+              Color statusColor = Colors.blue;
+              Color bgColor = Colors.blue.shade50;
+              IconData icon = Icons.info_outline;
+              String title = "User Login Success";
+              
+              if (isError) {
+                statusColor = Colors.red;
+                bgColor = Colors.red.shade50;
+                icon = Icons.error_outline;
+                title = "Database Connection Timeout";
+              } else if (isWarning) {
+                statusColor = Colors.orange;
+                bgColor = Colors.orange.shade50;
+                icon = Icons.warning_amber;
+                title = "High API Latency Detected";
+              }
+              
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: BorderSide(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
+                  ]
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(icon, color: statusColor, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  title, 
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)
+                                ),
+                                const Spacer(),
+                                Text(
+                                  "15:3$index:04 PST", 
+                                  style: TextStyle(
+                                    fontFamily: 'monospace', 
+                                    color: Colors.grey.shade500, 
+                                    fontSize: 12
+                                  )
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              isError ? "Connection refused by target machine 192.168.1.$index" 
+                                : isWarning ? "Response time degraded to 2.4s for endpoint /api/v1/drivers" 
+                                : "Auth token issued for user ID ${400 + index} from IP 10.0.0.$index",
+                              style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _Tag(text: "Server-0${(index % 3) + 1}"),
+                                const SizedBox(width: 8),
+                                _Tag(text: isError ? "db-cluster" : isWarning ? "gateway" : "auth-service"),
+                              ],
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+
+  const _FilterChip({required this.label, required this.isSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.indigo : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey.shade700,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+
+  const _Tag({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(4),
+        border: BorderSide(color: Colors.grey.shade300)
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontFamily: 'monospace'),
+      ),
     );
   }
 }
