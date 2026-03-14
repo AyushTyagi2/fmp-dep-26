@@ -43,50 +43,73 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: Text(_titles[_selectedIndex]),
-        backgroundColor: Colors.blueGrey,
+        title: Text(_titles[_selectedIndex], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.blueGrey.shade900,
+        elevation: 0.5,
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {},
+          ),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: CircleAvatar(
+              backgroundColor: Colors.indigo,
+              child: Text('SA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        backgroundColor: const Color(0xFF1E293B), // Slate 800
+        child: Column(
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blueGrey,
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(
+                color: Color(0xFF0F172A), // Slate 900
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.admin_panel_settings, size: 40, color: Color(0xFF1E293B)),
+              ),
+              accountName: const Text(
+                'System Administrator',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              accountEmail: const Text('admin@fmp.app', style: TextStyle(color: Colors.white70)),
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
                 children: [
-                  Icon(Icons.admin_panel_settings, size: 48, color: Colors.white),
-                  SizedBox(height: 12),
-                  Text(
-                    'Sys Admin Panel',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                    ),
+                  _buildDrawerItem(Icons.dashboard, "Overview", 0),
+                  _buildDrawerItem(Icons.people_alt, "Users", 1),
+                  _buildDrawerItem(Icons.receipt_long, "System Logs", 2),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Text("SYSTEM", style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                   ),
+                  _buildDrawerItem(Icons.queue_play_next, "Queue Management", 3),
+                  _buildDrawerItem(Icons.rule, "Rules Engine", 4),
                 ],
               ),
             ),
-            _buildDrawerItem(Icons.dashboard, "Overview", 0),
-            _buildDrawerItem(Icons.people, "Users", 1),
-            _buildDrawerItem(Icons.history, "System Logs", 2),
-            const Divider(),
-            _buildDrawerItem(Icons.queue, "Queue Management", 3),
-            _buildDrawerItem(Icons.settings, "Rules Engine", 4),
-            const Divider(),
+            const Divider(color: Colors.white24),
             ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               leading: const Icon(Icons.logout, color: Colors.redAccent),
-              title: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
+              title: const Text('Logout', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w500)),
               onTap: () {
-                // Return to Role Selection or Login
-                Navigator.pop(context); // Close drawer
+                Navigator.pop(context); 
                 Navigator.of(context).pushReplacementNamed('/role-selection');
               },
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -95,17 +118,23 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
   }
 
   Widget _buildDrawerItem(IconData icon, String title, int index) {
-    return ListTile(
-      leading: Icon(icon, color: _selectedIndex == index ? Colors.blueGrey : null),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: _selectedIndex == index ? Colors.blueGrey : null,
-          fontWeight: _selectedIndex == index ? FontWeight.bold : FontWeight.normal,
+    final isSelected = _selectedIndex == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        tileColor: isSelected ? Colors.indigo.withOpacity(0.15) : Colors.transparent,
+        leading: Icon(icon, color: isSelected ? Colors.indigo.shade200 : Colors.white70),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
         ),
+        selected: isSelected,
+        onTap: () => _onItemTapped(index),
       ),
-      selected: _selectedIndex == index,
-      onTap: () => _onItemTapped(index),
     );
   }
 }
