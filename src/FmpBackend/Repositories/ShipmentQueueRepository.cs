@@ -27,6 +27,16 @@ public class ShipmentQueueRepository
         return (items, total);
     }
 
+    public async Task<List<ShipmentQueue>> GetActiveQueuesAsync()
+    {
+        // For SysAdmin: fetch all queues that are currently processing, waiting, or failed
+        var activeStatuses = new[] { "waiting", "offered", "accepted" };
+        return await WithIncludes()
+            .Where(x => activeStatuses.Contains(x.Status))
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<ShipmentQueue?> GetByIdAsync(Guid id) =>
         await WithIncludes().FirstOrDefaultAsync(x => x.Id == id);
 

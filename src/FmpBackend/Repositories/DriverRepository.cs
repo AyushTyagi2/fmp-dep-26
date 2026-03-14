@@ -27,6 +27,14 @@ public class DriverRepository
         return _db.Drivers.Where(d => d.CurrentFleetOwnerId == fleetOwnerId).ToList();
     }
 
+    public int CountTotalActiveDrivers()
+    {
+        // Assuming active drivers are those marked 'Available' or 'On Trip' 
+        // Not specifically 'Suspended' or 'Inactive'
+        var inactiveStatuses = new[] { "Suspended", "Inactive" };
+        return _db.Drivers.Count(d => !inactiveStatuses.Contains(d.Status));
+    }
+
     public Driver Create(Driver driver)
     {
         _db.Drivers.Add(driver);

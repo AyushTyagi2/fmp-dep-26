@@ -5,42 +5,60 @@ namespace FmpBackend.Services;
 public class SysAdminService
 {
     private readonly UserRepository _users;
+    private readonly DriverRepository _drivers;
+    private readonly TripRepository _trips;
+    private readonly ShipmentRepository _shipments;
+    private readonly SystemLogRepository _logs;
+    private readonly SystemRuleRepository _rules;
 
-    public SysAdminService(UserRepository users)
+    public SysAdminService(
+        UserRepository users, 
+        DriverRepository drivers, 
+        TripRepository trips, 
+        ShipmentRepository shipments,
+        SystemLogRepository logs,
+        SystemRuleRepository rules)
     {
         _users = users;
+        _drivers = drivers;
+        _trips = trips;
+        _shipments = shipments;
+        _logs = logs;
+        _rules = rules;
     }
 
-    public object GetSystemMetrics()
+    public async Task<object> GetSystemMetricsAsync()
     {
-        // Mocking metrics data as there is no robust metric repository yet
+        var activeDrivers = _drivers.CountTotalActiveDrivers();
+        var pendingShipments = await _shipments.CountPendingShipmentsAsync();
+        var activeTrips = _trips.CountAllActiveTrips();
+        
         return new
         {
-            activeDrivers = 42,
-            pendingShipments = 15,
-            activeTrips = 8,
-            openDisputes = 2
+            activeDrivers,
+            pendingShipments,
+            activeTrips,
+            alerts = 3 // To be implemented with dynamic alert aggregation
         };
     }
 
-    public IEnumerable<object> GetRecentLogs()
+    public async Task<IEnumerable<object>> GetRecentLogsAsync()
     {
-        // Mocking recent log events 
-        var logs = new List<object>
+        var recentLogs = await _logs.GetRecentLogsAsync(50);
+        return recentLogs.Select(l => new 
         {
-            new { id = 1, timestamp = DateTime.UtcNow.AddMinutes(-10), level = "INFO", message = "System configuration updated" },
-            new { id = 2, timestamp = DateTime.UtcNow.AddMinutes(-45), level = "WARNING", message = "Failed login attempt from IP 192.168.1.100" },
-            new { id = 3, timestamp = DateTime.UtcNow.AddHours(-2), level = "ERROR", message = "Database connection timeout in billing module" },
-            new { id = 4, timestamp = DateTime.UtcNow.AddHours(-3), level = "INFO", message = "New fleet owner registered: 'TransCore Logistics'" }
-        };
-
-        return logs;
+            id = l.Id,
+            timestamp = l.Timestamp,
+            level = l.Level,
+            message = l.Message,
+            component = l.Component
+        });
     }
 
     public IEnumerable<object> GetActiveUsers()
     {
-        // Fetching real user data leveraging the UserRepository if needed, or returning mock list.
-        // For simplicity and error-free compilation right now, returning a static structure.
+        // Mocking structure temporarily to match frontend, 
+        // to be expanded with rich User queries once DTOs exist
         var users = new List<object>
         {
             new { id = Guid.NewGuid(), name = "Super Admin Profile", role = "SUPER_ADMIN", status = "Active", lastActive = DateTime.UtcNow.AddMinutes(-5) },
@@ -49,5 +67,49 @@ public class SysAdminService
         };
 
         return users;
+    }
+
+    public async Task<IEnumerable<object>> GetSystemRulesAsync()
+    {
+        var rules = await _rules.GetAllRulesAsync();
+        return rules.Select(r => new 
+        {
+            id = r.Id,
+            ruleKey = r.RuleKey,
+            description = r.Description,
+            isEnabled = r.IsEnabled,
+            value = r.Value
+        });
+    }
+
+    public async Task<object> UpdateSystemRuleAsync(string key, bool isEnabled, string? value = null)
+    {
+        var updated = await _rules.UpdateRuleAsync(key, isEnabled, value);
+        await _logs.AddLogAsync("INFO", $"System rule '{key}' updated to {isEnabled}", "rule-engine");
+        
+        return new 
+        {
+            id = updated.Id,
+            ruleKey = updated.RuleKey,
+            isEnabled = updated.IsEnabled,
+            value = updated.Value
+        };
+    }
+
+    public async Task<IEnumerable<object>> GetActiveQueuesAsync(ShipmentQueueRepository queueRepo)
+    {
+        var queues = await queueRepo.GetActiveQueuesAsync();
+        
+        return queues.Select(q => new
+        {
+            queueId = $"Q-{q.Id.ToString().Substring(0, 4).ToUpper()}-{q.Shipment.CargoType?.Substring(0, 3).ToUpper() ?? "GEN"}",
+            title = $"Shipment {q.Shipment.ShipmentNumber} ({q.Shipment.PickupAddress?.City ?? "Unknown"} to {q.Shipment.DropAddress?.City ?? "Unknown"})",
+            status = q.Status == "waiting" ? "queued" 
+                   : q.Status == "offered" ? "processing" 
+                   : q.Status == "accepted" ? "completed" : "failed",
+            progress = q.Status == "accepted" ? 1.0 : q.Status == "offered" ? 0.5 : 0.0,
+            itemsProcessed = q.Status == "accepted" ? 1 : 0,
+            totalItems = 1
+        });
     }
 }

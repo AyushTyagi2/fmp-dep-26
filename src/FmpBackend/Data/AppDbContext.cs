@@ -24,6 +24,10 @@ public class AppDbContext : DbContext
     public DbSet<QueueEvent> QueueEvents { get; set; }
 
       public DbSet<DriverQueueEntry> DriverQueueEntries { get; set; }
+
+    // SysAdmin Features
+    public DbSet<SystemRule> SystemRules { get; set; }
+    public DbSet<SystemLog> SystemLogs { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

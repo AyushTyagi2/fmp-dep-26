@@ -20,6 +20,12 @@ public class TripRepository
         return _db.Trips.Count(t => t.AssignedFleetOwnerId == fleetOwnerId && !inactive.Contains(t.CurrentStatus));
     }
 
+    public int CountAllActiveTrips()
+    {
+        var inactive = new[] { "completed", "delivered", "cancelled" };
+        return _db.Trips.Count(t => !inactive.Contains(t.CurrentStatus));
+    }
+
     public int CountTripsWithIssuesForFleetOwner(System.Guid fleetOwnerId)
     {
         return _db.Trips.Count(t => t.AssignedFleetOwnerId == fleetOwnerId && t.HasIssues);

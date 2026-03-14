@@ -63,6 +63,11 @@ public class ShipmentRepository
         .ToListAsync();
     }
 
+    public async Task<int> CountPendingShipmentsAsync()
+    {
+        return await _db.Shipments.CountAsync(s => s.Status == "pending" || s.Status == "approved" || s.Status == "unassigned");
+    }
+
     public async Task<List<Shipment>> GetApprovedShipmentsAsync()
     {
     return await _db.Shipments

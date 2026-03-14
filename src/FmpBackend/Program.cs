@@ -83,6 +83,8 @@ builder.Services.AddScoped<DriverQueueRepository>();
 builder.Services.AddScoped<QueueEventRepository>();
 builder.Services.AddScoped<DriverEligibleRepository>();
 builder.Services.AddScoped<SysAdminService>();
+builder.Services.AddScoped<SystemRuleRepository>(); // NEW
+builder.Services.AddScoped<SystemLogRepository>();  // NEW
 builder.Services.AddScoped<QueueEventService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddHostedService<QueueMaintenanceWorker>();
