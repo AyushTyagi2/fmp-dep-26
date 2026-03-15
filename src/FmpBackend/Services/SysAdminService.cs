@@ -55,18 +55,62 @@ public class SysAdminService
         });
     }
 
-    public IEnumerable<object> GetActiveUsers()
+    public async Task<IEnumerable<object>> GetActiveUsersAsync()
     {
-        // Mocking structure temporarily to match frontend, 
-        // to be expanded with rich User queries once DTOs exist
-        var users = new List<object>
+        var users = await _users.GetAllUsersAsync();
+        return users.Select(u => new 
         {
-            new { id = Guid.NewGuid(), name = "Super Admin Profile", role = "SUPER_ADMIN", status = "Active", lastActive = DateTime.UtcNow.AddMinutes(-5) },
-            new { id = Guid.NewGuid(), name = "John Doe", role = "DRIVER", status = "On Trip", lastActive = DateTime.UtcNow.AddMinutes(-1) },
-            new { id = Guid.NewGuid(), name = "Acme Inc", role = "ORGANIZATION", status = "Active", lastActive = DateTime.UtcNow.AddHours(-1) }
-        };
+            id = u.Id,
+            name = u.FullName,
+            phone = u.Phone,
+            role = u.Role,
+            status = u.IsActive ? "Active" : "Suspended",
+            provider = u.AuthProvider,
+            createdAt = u.CreatedAt
+        });
+    }
 
-        return users;
+    public async Task<bool> UpdateUserRoleAsync(Guid id, string role)
+    {
+        var user = _users.GetById(id);
+        if (user == null) return false;
+
+        user.Role = role;
+        _users.Update(user);
+        await _logs.AddLogAsync("INFO", $"User {id} role updated to {role}", "user-management");
+        return true;
+    }
+
+    public async Task<bool> ToggleUserStatusAsync(Guid id, bool isActive)
+    {
+        var user = _users.GetById(id);
+        if (user == null) return false;
+
+        user.IsActive = isActive;
+        _users.Update(user);
+        await _logs.AddLogAsync("INFO", $"User {id} status updated to Active={isActive}", "user-management");
+        return true;
+    }
+
+    public async Task<bool> ResetUserPasswordAsync(Guid id, string newPasswordHash)
+    {
+        var user = _users.GetById(id);
+        if (user == null) return false;
+
+        user.PasswordHash = newPasswordHash;
+        _users.Update(user);
+        await _logs.AddLogAsync("INFO", $"User {id} password reset", "user-management");
+        return true;
+    }
+
+    public async Task<bool> DeleteUserAsync(Guid id)
+    {
+        var success = await _users.DeleteUserAsync(id);
+        if (success)
+        {
+            await _logs.AddLogAsync("INFO", $"User {id} deleted", "user-management");
+        }
+        return success;
     }
 
     public async Task<IEnumerable<object>> GetSystemRulesAsync()

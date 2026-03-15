@@ -42,10 +42,25 @@ public class UserRepository
     }
 
     public Guid? GetIdByPhone(string phone)
-{
-    return _db.Users
-        .Where(u => u.Phone == phone)
-        .Select(u => (Guid?)u.Id)
-        .FirstOrDefault();
-}
+    {
+        return _db.Users
+            .Where(u => u.Phone == phone)
+            .Select(u => (Guid?)u.Id)
+            .FirstOrDefault();
+    }
+
+    public async Task<List<User>> GetAllUsersAsync()
+    {
+        return await _db.Users.ToListAsync();
+    }
+
+    public async Task<bool> DeleteUserAsync(Guid id)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null) return false;
+
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync();
+        return true;
+    }
 }
