@@ -123,8 +123,12 @@ class _FleetmgrOnboardingScreenState extends State<FleetmgrOnboardingScreen> {
     _cityCtrl.dispose();
     _stateCtrl.dispose();
     _postalCtrl.dispose();
-    for (final d in _drivers) d.dispose();
-    for (final v in _vehicles) v.dispose();
+    for (final d in _drivers) {
+      d.dispose();
+    }
+    for (final v in _vehicles) {
+      v.dispose();
+    }
     super.dispose();
   }
 
@@ -152,7 +156,7 @@ class _FleetmgrOnboardingScreenState extends State<FleetmgrOnboardingScreen> {
                     validator: (v) => v!.isEmpty ? 'Required' : null,
                   ),
                   DropdownButtonFormField(
-                    value: _orgType,
+                    initialValue: _orgType,
                     items: const [
                       DropdownMenuItem(value: "company", child: Text("Company")),
                       DropdownMenuItem(value: "individual", child: Text("Individual")),

@@ -25,7 +25,7 @@ class CargoDetailsSection extends StatelessWidget {
 
         // Cargo Type
         DropdownButtonFormField<String>(
-          value: draft.cargoType,
+          initialValue: draft.cargoType,
           decoration: const InputDecoration(
             labelText: 'Cargo Type',
             border: OutlineInputBorder(),

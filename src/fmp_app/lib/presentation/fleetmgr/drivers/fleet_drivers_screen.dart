@@ -49,7 +49,7 @@ class _FleetDriversScreenState extends State<FleetDriversScreen> {
           : ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               itemCount: state.drivers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final d = state.drivers[index] as Driver;
 
@@ -60,7 +60,7 @@ class _FleetDriversScreenState extends State<FleetDriversScreen> {
                   final parts = name.split(' ');
                   initials = parts.map((p) => p.isNotEmpty ? p[0] : '').take(2).join().toUpperCase();
                 } else if ((d.phone ?? '').isNotEmpty) {
-                  initials = d.phone!.replaceAll(RegExp(r'[^0-9]'), '');
+                  initials = d.phone.replaceAll(RegExp(r'[^0-9]'), '');
                   if (initials.length > 2) initials = initials.substring(initials.length - 2);
                 }
 

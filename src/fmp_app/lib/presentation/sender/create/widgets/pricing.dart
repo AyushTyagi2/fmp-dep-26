@@ -131,7 +131,7 @@ class PricePerUnitDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: draft.pricePerUnit,
+      initialValue: draft.pricePerUnit,
       decoration: const InputDecoration(
         labelText: 'Price Per Unit',
         border: OutlineInputBorder(),

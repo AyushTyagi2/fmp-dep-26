@@ -65,7 +65,7 @@ class _SenderOnboardingScreenState extends State<SenderOnboardingScreen> {
               ),
 
               DropdownButtonFormField(
-                value: _orgType,
+                initialValue: _orgType,
                 items: const [
                   DropdownMenuItem(value: "company", child: Text("Company")),
                   DropdownMenuItem(value: "individual", child: Text("Individual")),
