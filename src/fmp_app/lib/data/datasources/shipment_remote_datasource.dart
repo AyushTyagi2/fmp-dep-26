@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import '../../core/network/api_client.dart';
 
 import '../models/shipment/create_shipment_request.dart';
 
