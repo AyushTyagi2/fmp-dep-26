@@ -40,7 +40,7 @@ class UsersView extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: BorderSide(color: Colors.grey.shade200)
+                  border: Border.all(color: Colors.grey.shade200)
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.filter_list, color: Colors.black87), 
@@ -62,7 +62,7 @@ class UsersView extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: BorderSide(color: Colors.grey.shade200),
+                  border: Border.all(color: Colors.grey.shade200),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
                   ]

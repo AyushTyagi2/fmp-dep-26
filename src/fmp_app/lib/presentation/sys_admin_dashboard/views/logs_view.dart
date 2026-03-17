@@ -58,7 +58,7 @@ class LogsView extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: BorderSide(color: Colors.grey.shade200),
+                  border: Border.all(color: Colors.grey.shade200),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
                   ]
@@ -167,7 +167,7 @@ class _Tag extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(4),
-        border: BorderSide(color: Colors.grey.shade300)
+        border: Border.all(color: Colors.grey.shade300)
       ),
       child: Text(
         text,
