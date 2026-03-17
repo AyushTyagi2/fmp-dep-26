@@ -4,6 +4,7 @@ import 'package:fmp_app/presentation/sys_admin_dashboard/views/users_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/logs_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/queue_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/rules_view.dart';
+import 'package:fmp_app/core/theme/app_theme.dart';
 
 // This is the MAIN container for the Sys Admin module.
 class SysAdminDashboardScreen extends StatefulWidget {
@@ -43,12 +44,12 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: Text(_titles[_selectedIndex], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.blueGrey.shade900,
-        elevation: 0.5,
+        backgroundColor: AppTheme.surface,
+        foregroundColor: AppTheme.primary,
+        elevation: 0,
         centerTitle: false,
         actions: [
           IconButton(
@@ -58,7 +59,7 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
           const Padding(
             padding: EdgeInsets.all(8.0),
             child: CircleAvatar(
-              backgroundColor: Colors.indigo,
+              backgroundColor: AppTheme.primary,
               child: Text('SA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
@@ -66,16 +67,16 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
         ],
       ),
       drawer: Drawer(
-        backgroundColor: const Color(0xFF1E293B), // Slate 800
+        backgroundColor: AppTheme.primary, // using primary instead of slate for drawer mapping
         child: Column(
           children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F172A), // Slate 900
+            const UserAccountsDrawerHeader(
+              decoration: BoxDecoration(
+                color: Color(0xFF10284f), // darker primary
               ),
-              currentAccountPicture: const CircleAvatar(
+              currentAccountPicture: CircleAvatar(
                 backgroundColor: Colors.white,
-                child: Icon(Icons.admin_panel_settings, size: 40, color: Color(0xFF1E293B)),
+                child: Icon(Icons.admin_panel_settings, size: 40, color: AppTheme.primary),
               ),
               accountName: const Text(
                 'System Administrator',
@@ -122,14 +123,14 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        tileColor: isSelected ? Colors.indigo.withOpacity(0.15) : Colors.transparent,
-        leading: Icon(icon, color: isSelected ? Colors.indigo.shade200 : Colors.white70),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        tileColor: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
+        leading: Icon(icon, color: isSelected ? Colors.white : Colors.white70),
         title: Text(
           title,
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.white70,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
         selected: isSelected,

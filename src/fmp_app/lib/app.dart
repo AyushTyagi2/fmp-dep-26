@@ -5,6 +5,7 @@ import 'presentation/driver/driver_state.dart';
 import 'presentation/fleetmgr/fleet_state.dart';
 import 'routes/app_router.dart';
 import 'package:fmp_app/presentation/auth/auth_api.dart';
+import 'core/theme/app_theme.dart';
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -25,6 +26,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
         initialRoute: AppRouter.welcome,
         routes: AppRouter.routes,
       ),
