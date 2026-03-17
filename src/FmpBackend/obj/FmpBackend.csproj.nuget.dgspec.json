@@ -14,7 +14,11 @@
         "outputPath": "E:\\fmp-dep-26\\src\\FmpBackend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
+<<<<<<< HEAD
           "C:\\Users\\NISHANT\\AppData\\Roaming\\NuGet\\NuGet.Config"
+=======
+          "C:\\Users\\asus\\AppData\\Roaming\\NuGet\\NuGet.Config"
+>>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -37,7 +41,8 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        }
+        },
+        "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
         "net8.0": {
@@ -93,7 +98,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.418/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

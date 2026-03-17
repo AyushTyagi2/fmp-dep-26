@@ -424,6 +424,7 @@ C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Proto
 C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
 C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
+<<<<<<< HEAD
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Abstractions.dll
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.JsonWebTokens.dll
@@ -432,3 +433,5 @@ E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
 E:\fmp-dep-26\src\FmpBackend\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
+=======
+>>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
