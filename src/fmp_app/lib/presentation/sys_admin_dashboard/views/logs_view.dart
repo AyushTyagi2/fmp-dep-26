@@ -12,12 +12,22 @@ class LogsView extends StatelessWidget {
           color: Colors.white,
           child: Row(
             children: [
-              _FilterChip(label: "All Logs", isSelected: true),
+              // FIX 2: Wrapped chips in an Expanded + SingleChildScrollView to prevent overflow
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      const _FilterChip(label: "All Logs", isSelected: true),
+                      const SizedBox(width: 8),
+                      const _FilterChip(label: "Errors", isSelected: false),
+                      const SizedBox(width: 8),
+                      const _FilterChip(label: "Warnings", isSelected: false),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
-              _FilterChip(label: "Errors", isSelected: false),
-              const SizedBox(width: 8),
-              _FilterChip(label: "Warnings", isSelected: false),
-              const Spacer(),
               TextButton.icon(
                 icon: const Icon(Icons.download, size: 18),
                 label: const Text("Export"),
@@ -56,69 +66,77 @@ class LogsView extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: bgColor, // FIX 1: Applied your calculated background color here!
                   borderRadius: BorderRadius.circular(12),
-                  border: BorderSide(color: Colors.grey.shade200),
+                  border: Border.all(color: Colors.grey.shade300),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
                   ]
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(icon, color: statusColor, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                  title, 
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)
-                                ),
-                                const Spacer(),
-                                Text(
-                                  "15:3$index:04 PST", 
-                                  style: TextStyle(
-                                    fontFamily: 'monospace', 
-                                    color: Colors.grey.shade500, 
-                                    fontSize: 12
-                                  )
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              isError ? "Connection refused by target machine 192.168.1.$index" 
-                                : isWarning ? "Response time degraded to 2.4s for endpoint /api/v1/drivers" 
-                                : "Auth token issued for user ID ${400 + index} from IP 10.0.0.$index",
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _Tag(text: "Server-0${(index % 3) + 1}"),
-                                const SizedBox(width: 8),
-                                _Tag(text: isError ? "db-cluster" : isWarning ? "gateway" : "auth-service"),
-                              ],
-                            )
-                          ],
+                // FIX 3: Used IntrinsicHeight and CrossAxisAlignment.stretch so the colored bar expands dynamically
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        width: 4,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12), 
+                            bottomLeft: Radius.circular(12)
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(icon, color: statusColor, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      title, 
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "15:3$index:04 PST", 
+                                    style: TextStyle(
+                                      fontFamily: 'monospace', 
+                                      color: Colors.grey.shade500, 
+                                      fontSize: 12
+                                    )
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                isError ? "Connection refused by target machine 192.168.1.$index" 
+                                  : isWarning ? "Response time degraded to 2.4s for endpoint /api/v1/drivers" 
+                                  : "Auth token issued for user ID ${400 + index} from IP 10.0.0.$index",
+                                style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  _Tag(text: "Server-0${(index % 3) + 1}"),
+                                  const SizedBox(width: 8),
+                                  _Tag(text: isError ? "db-cluster" : isWarning ? "gateway" : "auth-service"),
+                                ],
+                              )
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -167,7 +185,7 @@ class _Tag extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(4),
-        border: BorderSide(color: Colors.grey.shade300)
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: Text(
         text,

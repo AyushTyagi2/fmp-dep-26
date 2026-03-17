@@ -75,7 +75,7 @@ class _RuleSection extends StatelessWidget {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            border: BorderSide(color: Colors.grey.shade200),
+            side: BorderSide(color: Colors.grey.shade200),
           ),
           child: Column(
             children: rules.asMap().entries.map((entry) {
