@@ -165,7 +165,7 @@ modelBuilder.Entity<FleetOwner>(entity =>
         entity.Property(e => e.State).HasColumnName("state");
         entity.Property(e => e.PostalCode).HasColumnName("postal_code");
 
-        entity.Property(e => e.Industry).HasColumnName("industry");
+    entity.Property(e => e.Industry).HasColumnName("industry");
         entity.Property(e => e.Description).HasColumnName("description");
 
         entity.Property(e => e.Status).HasColumnName("status");
@@ -173,6 +173,17 @@ modelBuilder.Entity<FleetOwner>(entity =>
               .HasColumnName("created_at")
               .HasDefaultValueSql("CURRENT_TIMESTAMP");
     });
+
+    // Seed default System Rules
+    modelBuilder.Entity<SystemRule>().HasData(
+        new SystemRule { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), RuleKey = "AutoAssignDriver", Description = "Automatically assign unassigned jobs to the closest available driver within 5km.", IsEnabled = true },
+        new SystemRule { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), RuleKey = "StrictVehicleRequirement", Description = "Enforce strict matching of vehicle type requested by sender.", IsEnabled = true },
+        new SystemRule { Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), RuleKey = "AllowManualOverride", Description = "Allow dispatchers to manually override system routing.", IsEnabled = false },
+        new SystemRule { Id = Guid.Parse("44444444-4444-4444-4444-444444444444"), RuleKey = "DynamicSurgePricing", Description = "Enable surge multiplier during high demand hours.", IsEnabled = true, Value = "1.5x max" },
+        new SystemRule { Id = Guid.Parse("55555555-5555-5555-5555-555555555555"), RuleKey = "AutoSettlement", Description = "Automatically process driver payouts at end of day.", IsEnabled = false },
+        new SystemRule { Id = Guid.Parse("66666666-6666-6666-6666-666666666666"), RuleKey = "StrictKYC", Description = "Require manual approval of all new driver KYC documents.", IsEnabled = true },
+        new SystemRule { Id = Guid.Parse("77777777-7777-7777-7777-777777777777"), RuleKey = "Force2FA", Description = "Require two-factor authentication for all system administrator actions.", IsEnabled = true }
+    );
 }
     
 }

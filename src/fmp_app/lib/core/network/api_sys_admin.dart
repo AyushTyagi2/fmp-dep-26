@@ -54,4 +54,28 @@ class ApiSysAdmin {
       return false;
     }
   }
+  Future<List<Map<String, dynamic>>> getSystemRules() async {
+    try {
+      final response = await _client.dio.get('/sysadmin/rules');
+      final rulesList = response.data['rules'] as List;
+      return rulesList.map((e) => e as Map<String, dynamic>).toList();
+    } catch (e) {
+      print("Error fetching sysadmin rules: $e");
+      return [];
+    }
+  }
+
+  Future<bool> updateSystemRule(String key, bool isEnabled, String? value) async {
+    try {
+      final data = {'isEnabled': isEnabled};
+      if (value != null) {
+        data['value'] = value;
+      }
+      final response = await _client.dio.put('/sysadmin/rules/$key', data: data);
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error updating system rule: $e");
+      return false;
+    }
+  }
 }
