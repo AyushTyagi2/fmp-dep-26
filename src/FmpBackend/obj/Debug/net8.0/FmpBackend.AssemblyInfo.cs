@@ -14,11 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FmpBackend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-<<<<<<< HEAD
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2b44331141542a9e2287559e1f8efc532bcf5c71")]
-=======
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0ecdcdaa893b77a2360aedb35b00b3fc8d17f64d")]
->>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ae209923ccd1ce6027a94213dc864681ee8b024")]
 [assembly: System.Reflection.AssemblyProductAttribute("FmpBackend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FmpBackend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

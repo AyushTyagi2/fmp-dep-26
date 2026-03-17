@@ -371,7 +371,6 @@
           }
         }
       },
-<<<<<<< HEAD
       "Microsoft.Extensions.Logging/8.0.0": {
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection": "8.0.0",
@@ -391,8 +390,6 @@
         }
       },
       "Microsoft.Extensions.Primitives/8.0.0": {},
-=======
->>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
       "Microsoft.IdentityModel.Abstractions/7.5.2": {
         "runtime": {
           "lib/net8.0/Microsoft.IdentityModel.Abstractions.dll": {
@@ -586,7 +583,6 @@
             "fileVersion": "7.5.2.50513"
           }
         }
-<<<<<<< HEAD
       },
       "System.IO.Pipelines/6.0.3": {},
       "System.Reflection.Metadata/6.0.1": {
@@ -607,9 +603,6 @@
         }
       },
       "System.Threading.Channels/6.0.0": {}
-=======
-      }
->>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
     }
   },
   "libraries": {
@@ -765,7 +758,6 @@
       "path": "microsoft.extensions.dependencymodel/8.0.0",
       "hashPath": "microsoft.extensions.dependencymodel.8.0.0.nupkg.sha512"
     },
-<<<<<<< HEAD
     "Microsoft.Extensions.Logging/8.0.0": {
       "type": "package",
       "serviceable": true,
@@ -794,8 +786,6 @@
       "path": "microsoft.extensions.primitives/8.0.0",
       "hashPath": "microsoft.extensions.primitives.8.0.0.nupkg.sha512"
     },
-=======
->>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
     "Microsoft.IdentityModel.Abstractions/7.5.2": {
       "type": "package",
       "serviceable": true,
@@ -928,7 +918,6 @@
       "sha512": "sha512-taMjs3z9+tTYNhdD5g5XU89gMcqX7PSI6oji7yZXK8E4T1XjsZR5yDLdIqC1PVKYL5FAlrNWBNBaLshuESYHlw==",
       "path": "system.identitymodel.tokens.jwt/7.5.2",
       "hashPath": "system.identitymodel.tokens.jwt.7.5.2.nupkg.sha512"
-<<<<<<< HEAD
     },
     "System.IO.Pipelines/6.0.3": {
       "type": "package",
@@ -978,8 +967,6 @@
       "sha512": "sha512-TY8/9+tI0mNaUMgntOxxaq2ndTkdXqLSxvPmas7XEqOlv9lQtB7wLjYGd756lOaO7Dvb5r/WXhluM+0Xe87v5Q==",
       "path": "system.threading.channels/6.0.0",
       "hashPath": "system.threading.channels.6.0.0.nupkg.sha512"
-=======
->>>>>>> 1676c50d42ce61ea81ec65df10af77bd8e90a1a8
     }
   }
 }
