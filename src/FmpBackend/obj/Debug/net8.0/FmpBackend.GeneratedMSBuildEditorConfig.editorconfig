@@ -9,11 +9,19 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = FmpBackend
 build_property.RootNamespace = FmpBackend
+<<<<<<< HEAD
 build_property.ProjectDir = E:\fmp-dep-26\src\FmpBackend\
+=======
+build_property.ProjectDir = C:\Users\Admin\OneDrive\Desktop\fmp-dep-26\src\FmpBackend\
+>>>>>>> 35792227950520d4c427956db636efb389afa932
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 8.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+<<<<<<< HEAD
 build_property.MSBuildProjectDirectory = E:\fmp-dep-26\src\FmpBackend
+=======
+build_property.MSBuildProjectDirectory = C:\Users\Admin\OneDrive\Desktop\fmp-dep-26\src\FmpBackend
+>>>>>>> 35792227950520d4c427956db636efb389afa932
 build_property._RazorSourceGeneratorDebug = 

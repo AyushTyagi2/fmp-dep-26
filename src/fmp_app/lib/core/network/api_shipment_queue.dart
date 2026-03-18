@@ -150,7 +150,7 @@ class ShipmentApiService {
       );
       final data = res.data as Map<String, dynamic>;
       if (data['active'] != true) return null;
-      return QueueSlot.fromJson(data as Map<String, dynamic>);
+      return QueueSlot.fromJson(data);
     } catch (_) {
       return null;
     }
