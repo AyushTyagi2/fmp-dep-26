@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
 import '../../models/shipment_draft.dart';
 
-
-class SectionTitle extends StatelessWidget {
-  final String title;
-
-  const SectionTitle({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
+// --- Formal Corporate UI Helper ---
+InputDecoration _formalInputDecoration(String label, {IconData? suffixIcon}) {
+  return InputDecoration(
+    labelText: label,
+    labelStyle: const TextStyle(color: Color(0xFF475569), fontSize: 14),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    suffixIcon: suffixIcon != null ? Icon(suffixIcon, color: const Color(0xFF475569), size: 20) : null,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(6),
+      borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+    ),
+  );
 }
 
 class PickupDeliverySection extends StatefulWidget {
@@ -28,92 +34,61 @@ class PickupDeliverySection extends StatefulWidget {
   });
 
   @override
-  State<PickupDeliverySection> createState() =>
-      _PickupDeliverySectionState();
+  State<PickupDeliverySection> createState() => _PickupDeliverySectionState();
 }
 
-class _PickupDeliverySectionState
-    extends State<PickupDeliverySection> {
-
+class _PickupDeliverySectionState extends State<PickupDeliverySection> {
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionTitle(title: 'Pickup & Delivery'),
-        SizedBox(height: 16),
-
-        //PickupAddressField(draft: widget.draft),
-        //SizedBox(height: 12),
-
-        //DropAddressField(draft: widget.draft),
-        //SizedBox(height: 12),
-        ReceiverPhoneField(draft: widget.draft),
-        SizedBox(height: 12),
-        
-        PickupDateField(draft: widget.draft),
-        SizedBox(height: 12),
-
-        DeliveryDateField(draft: widget.draft),
-        SizedBox(height: 12),
-
-        UrgentToggle(
-          draft: widget.draft,
-          onChanged: (value) {
-            setState(() {
-              widget.draft.isUrgent = value;
-            });
-          },
-        ),
-      ],
-    );
-  }
-}
-
-
-
-
-/*class PickupAddressField extends StatelessWidget {
-  final ShipmentDraft draft;
-  const PickupAddressField({super.key, required this.draft});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      readOnly: true,
-      initialValue: draft.pickupAddressId,
-      decoration: const InputDecoration(
-        labelText: 'Pickup Address',
-        border: OutlineInputBorder(),
-        suffixIcon: Icon(Icons.location_on),
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1),
       ),
-      onTap: () {
-        // open address selector later
-        draft.pickupAddressId = "ADDRESS_ID_SAMPLE";
-      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '2. Pickup & Delivery Scheduling',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+          ),
+          const SizedBox(height: 24),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 24),
+
+          ReceiverPhoneField(draft: widget.draft),
+          const SizedBox(height: 20),
+
+          Row(
+            children: [
+              Expanded(child: PickupDateField(draft: widget.draft)),
+              const SizedBox(width: 16),
+              Expanded(child: DeliveryDateField(draft: widget.draft)),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(6)
+            ),
+            child: UrgentToggle(
+              draft: widget.draft,
+              onChanged: (value) {
+                setState(() {
+                  widget.draft.isUrgent = value;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
-
-class DropAddressField extends StatelessWidget {
-  final ShipmentDraft draft;
-  const DropAddressField({super.key, required this.draft});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      readOnly: true,
-      initialValue: draft.dropAddressId,
-      decoration: const InputDecoration(
-        labelText: 'Drop Address',
-        border: OutlineInputBorder(),
-        suffixIcon: Icon(Icons.location_on_outlined),
-      ),
-      onTap: () { draft.dropAddressId = "ADDRESS_ID_SAMPLE";},
-    );
-  }
-}*/
-
 
 class ReceiverPhoneField extends StatelessWidget {
   final ShipmentDraft draft;
@@ -123,10 +98,7 @@ class ReceiverPhoneField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      decoration: const InputDecoration(
-        labelText: 'Receiver Phone Number',
-        border: OutlineInputBorder(),
-      ),
+      decoration: _formalInputDecoration('Receiver Phone Number', suffixIcon: Icons.phone_outlined),
       keyboardType: TextInputType.phone,
       onChanged: (value) {
         draft.receiverPhone = value;
@@ -152,11 +124,7 @@ class _PickupDateFieldState extends State<PickupDateField> {
     return TextFormField(
       controller: _controller,
       readOnly: true,
-      decoration: const InputDecoration(
-        labelText: 'Preferred Pickup Date',
-        border: OutlineInputBorder(),
-        suffixIcon: Icon(Icons.calendar_today),
-      ),
+      decoration: _formalInputDecoration('Preferred Pickup Date', suffixIcon: Icons.calendar_today_outlined),
       onTap: () async {
         final selected = await showDatePicker(
           context: context,
@@ -168,8 +136,7 @@ class _PickupDateFieldState extends State<PickupDateField> {
         if (selected != null) {
           setState(() {
             widget.draft.preferredPickupDate = selected;
-            _controller.text =
-                "${selected.day}/${selected.month}/${selected.year}";
+            _controller.text = "${selected.day}/${selected.month}/${selected.year}";
           });
         }
       },
@@ -177,43 +144,42 @@ class _PickupDateFieldState extends State<PickupDateField> {
   }
 }
 
-
-class DeliveryDateField extends StatelessWidget {
+class DeliveryDateField extends StatefulWidget {
   final ShipmentDraft draft;
 
-  const DeliveryDateField({
-    super.key,
-    required this.draft,
-  });
+  const DeliveryDateField({super.key, required this.draft});
+
+  @override
+  State<DeliveryDateField> createState() => _DeliveryDateFieldState();
+}
+
+class _DeliveryDateFieldState extends State<DeliveryDateField> {
+  final TextEditingController _controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      controller: _controller,
       readOnly: true,
-      
-      decoration: const InputDecoration(
-        labelText: 'Preferred Delivery Date',
-        border: OutlineInputBorder(),
-        suffixIcon: Icon(Icons.calendar_today_outlined),
-      ),
+      decoration: _formalInputDecoration('Preferred Delivery Date', suffixIcon: Icons.event_available_outlined),
       onTap: () async {
         final selected = await showDatePicker(
           context: context,
           firstDate: DateTime.now(),
           lastDate: DateTime(2100),
-          initialDate:DateTime.now(),
+          initialDate: DateTime.now(),
         );
 
         if (selected != null) {
-          draft.preferredDeliveryDate = selected;
+          setState(() {
+             widget.draft.preferredDeliveryDate = selected;
+             _controller.text = "${selected.day}/${selected.month}/${selected.year}";
+          });
         }
       },
     );
   }
 }
-
-
-
 
 class UrgentToggle extends StatelessWidget {
   final ShipmentDraft draft;
@@ -228,14 +194,12 @@ class UrgentToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: const Text('Mark as Urgent'),
-      subtitle: const Text('Higher priority for carriers'),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: const Text('Mark as Urgent Dispatch', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1E293B))),
+      subtitle: const Text('Assigns higher priority in the carrier matching queue', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
       value: draft.isUrgent,
+      activeColor: const Color(0xFF0F172A),
       onChanged: onChanged,
     );
   }
 }
-
-
-
