@@ -10,27 +10,23 @@ class PhoneInputScreen extends StatefulWidget {
 }
 
 class _PhoneInputScreenState extends State<PhoneInputScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey   = GlobalKey<FormState>();
   final _phoneCtrl = TextEditingController();
-  //final _vehicleCtrl = TextEditingController();
 
   @override
   void dispose() {
     _phoneCtrl.dispose();
-   // _vehicleCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOtp(BuildContext context) async {
-    final auth = context.read<AuthController>();
-
+  Future<void> _submit(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
 
+    final auth = context.read<AuthController>();
     auth.setPhone(_phoneCtrl.text.trim());
-    //auth.setVehicle(_vehicleCtrl.text.trim());
-
     await auth.sendOtp();
-    if(!mounted) return;
+
+    if (!mounted) return;
     if (auth.stage == AuthStage.otpSent) {
       Navigator.pushNamed(context, '/otp');
     }
@@ -38,7 +34,8 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthController>();
+    final auth   = context.watch<AuthController>();
+    final isBusy = auth.stage == AuthStage.otpSending;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
@@ -57,19 +54,16 @@ class _PhoneInputScreenState extends State<PhoneInputScreen> {
                 ),
                 validator: (v) {
                   final s = v?.trim() ?? '';
-                  if (s.length < 10) return 'Enter valid phone number';
+                  if (s.length < 10) return 'Enter a valid 10-digit number';
                   return null;
                 },
               ),
-              
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: auth.stage == AuthStage.otpSending
-                      ? null
-                      : () => _sendOtp(context),
-                  child: auth.stage == AuthStage.otpSending
+                  onPressed: isBusy ? null : () => _submit(context),
+                  child: isBusy
                       ? const SizedBox(
                           height: 18,
                           width: 18,

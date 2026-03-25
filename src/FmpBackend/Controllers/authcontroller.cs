@@ -9,9 +9,9 @@ namespace FmpBackend.Controllers;
 [Route("auth")]
 public class AuthController : ControllerBase
 {
-    private readonly OtpService    _otpService;
-    private readonly RoleService   _roleService;
-    private readonly JwtService    _jwtService;
+    private readonly OtpService       _otpService;
+    private readonly RoleService      _roleService;
+    private readonly JwtService       _jwtService;
     private readonly DriverRepository _drivers;
     private readonly UserRepository   _users;
 
@@ -29,6 +29,7 @@ public class AuthController : ControllerBase
         _users       = users;
     }
 
+    // POST /auth/request-otp
     [HttpPost("request-otp")]
     public IActionResult RequestOtp([FromBody] RequestOtpDto dto)
     {
@@ -36,13 +37,21 @@ public class AuthController : ControllerBase
         return Ok(new { success = true });
     }
 
+    // POST /auth/verify-otp
+    // Verifies OTP, creates user if new, resolves destination screen, issues JWT.
+    // Flutter navigates directly to the returned screen — no extra calls needed.
     [HttpPost("verify-otp")]
     public IActionResult VerifyOtp([FromBody] VerifyOtpDto dto)
     {
         try
         {
-            _otpService.VerifyOtp(dto.Phone, dto.Otp);
-            return Ok(new { success = true });
+            var user = _otpService.VerifyOtp(dto.Phone, dto.Otp);
+
+            var (screen, roleForJwt, driverId) = _roleService.ResolveAfterOtp(dto.Phone, user.Id);
+
+            var token = _jwtService.Generate(dto.Phone, roleForJwt);
+
+            return Ok(new { success = true, screen, token, driverId });
         }
         catch (Exception ex)
         {
@@ -50,13 +59,14 @@ public class AuthController : ControllerBase
         }
     }
 
+    // POST /auth/resolve-role
+    // Only called from the role-selection screen (driver / organisation path).
     [HttpPost("resolve-role")]
     public IActionResult ResolveRole([FromBody] ResolveRoleDto dto)
     {
         var screen = _roleService.Resolve(dto.Phone, dto.Role);
         var token  = _jwtService.Generate(dto.Phone, dto.Role);
 
-        // Look up driverId if this is a driver
         string? driverId = null;
         var user = _users.GetByPhone(dto.Phone);
         if (user != null)
