@@ -1,6 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../models/shipment.dart';
 import 'api_client.dart';
+
+// ─── DateTime helper ─────────────────────────────────────────────────────────
+
+/// ASP.NET Core serializes DateTime without a timezone suffix (e.g.
+/// "2026-03-25T05:28:53.412907"). Dart's DateTime.parse treats bare strings
+/// as LOCAL time, which is wrong — the server always stores UTC.
+/// Appending 'Z' forces correct UTC parsing before converting to local.
+DateTime _parseUtc(String raw) {
+  final normalized = raw.endsWith('Z') || raw.contains('+') ? raw : '${raw}Z';
+  return DateTime.parse(normalized).toLocal();
+}
 
 // ─── Result types ────────────────────────────────────────────────────────────
 
@@ -57,7 +69,7 @@ class CurrentOffer {
                         : null,
     isUrgent        : json['isUrgent']        as bool,
     expiresAt       : json['expiresAt'] != null
-                        ? DateTime.parse(json['expiresAt'] as String).toLocal()
+                        ? _parseUtc(json['expiresAt'] as String)
                         : null,
   );
 
@@ -91,20 +103,27 @@ class QueueSlot {
     this.currentOffer,
   });
 
-  factory QueueSlot.fromJson(Map<String, dynamic> json) => QueueSlot(
-    eventId      : json['eventId']      as String,
-    eventStatus  : json['eventStatus']  as String,
-    eventEndTime : DateTime.parse(json['eventEndTime'] as String),
-    position     : json['position']     as int,
-    hasClaimed   : json['hasClaimed']   as bool,
-    offerStatus  : json['offerStatus']  as String,
-    currentOffer : json['currentOffer'] != null
-                     ? CurrentOffer.fromJson(json['currentOffer'] as Map<String, dynamic>)
-                     : null,
-  );
+  factory QueueSlot.fromJson(Map<String, dynamic> json) {
+    debugPrint('[QueueSlot.fromJson] raw: $json');
+    return QueueSlot(
+      eventId      : json['eventId'].toString(),
+      eventStatus  : json['eventStatus'].toString(),
+      eventEndTime : _parseUtc(json['eventEndTime'].toString()),
+      position     : (json['position'] as num).toInt(),
+      hasClaimed   : json['hasClaimed'] as bool,
+      offerStatus  : json['offerStatus'].toString(),
+      currentOffer : json['currentOffer'] != null
+                       ? CurrentOffer.fromJson(json['currentOffer'] as Map<String, dynamic>)
+                       : null,
+    );
+  }
 
-  bool get hasActiveOffer  => offerStatus == 'pending' && currentOffer != null;
-  bool get isWindowOpen    => !hasClaimed && eventStatus == 'live';
+  bool get hasActiveOffer    => offerStatus == 'pending' && currentOffer != null;
+  // Open when the event is live and driver is idle/passed/expired (waiting for next offer)
+  bool get isWindowOpen      => eventStatus == 'live' &&
+      (offerStatus == 'idle' || offerStatus == 'passed' || offerStatus == 'expired');
+  // True if the driver has already accepted a shipment in this event
+  bool get hasAlreadyClaimed => hasClaimed || offerStatus == 'accepted';
 }
 
 // ─── Paged result (unchanged) ─────────────────────────────────────────────────
@@ -140,20 +159,15 @@ class ShipmentApiService {
     return PagedResult.fromJson(res.data as Map<String, dynamic>, Shipment.fromJson);
   }
 
-  /// Returns the driver's slot in the active QueueEvent, including their
-  /// current highlighted offer (if any), or null if no event is live.
   Future<QueueSlot?> getMyQueueSlot(String driverId) async {
-    try {
-      final res = await _dio.get(
-        '/api/queue-events/active',
-        queryParameters: {'driverId': driverId},
-      );
-      final data = res.data as Map<String, dynamic>;
-      if (data['active'] != true) return null;
-      return QueueSlot.fromJson(data);
-    } catch (_) {
-      return null;
-    }
+    final res = await _dio.get(
+      '/api/queue-events/active',
+      queryParameters: {'driverId': driverId},
+    );
+    final data = res.data as Map<String, dynamic>;
+    // Backend returns { active: false } when no live event exists
+    if (data['active'] != true) return null;
+    return QueueSlot.fromJson(data);
   }
 
   Future<AcceptResult> acceptShipment({
@@ -201,5 +215,20 @@ class ShipmentApiService {
   Future<Shipment> getQueueItemById(String id) async {
     final res = await _dio.get('/api/shipment-queue/$id');
     return Shipment.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  // ── Queue live-status (union toggle) ───────────────────────────────────────
+
+  /// Returns { isLive: bool, eventId: String?, endTime: String? }
+  Future<Map<String, dynamic>> getQueueLiveStatus() async {
+    final res = await _dio.get('/api/queue-events/live-status');
+    return res.data as Map<String, dynamic>;
+  }
+
+  /// Toggles the given queue event live ↔ closed.
+  /// Returns the updated status map.
+  Future<Map<String, dynamic>> toggleQueueEvent(String eventId) async {
+    final res = await _dio.post('/api/queue-events/$eventId/toggle');
+    return res.data as Map<String, dynamic>;
   }
 }

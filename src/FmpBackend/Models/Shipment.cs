@@ -34,14 +34,23 @@ public class Shipment
     public decimal UnloadingCharges { get; set; }
     public decimal OtherCharges { get; set; }
     public decimal? TotalEstimatedPrice { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
     public string? RejectionReason { get; set; }
 
-    // ✅ Navigation properties for address resolution in queue DTO
+    // Navigation properties for address resolution in queue DTO
     public Address? PickupAddress { get; set; }
     public Address? DropAddress { get; set; }
 
     public string Status { get; set; } = "pending_approval";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    // ── Admin override fields (matches admin_logging_layer.sql) ──────────────
+    public bool    UpdatedByAdmin    { get; set; } = false;
+    public Guid?   AdminOverrideBy   { get; set; }   // FK → users.id
+    public DateTime? AdminOverrideAt { get; set; }
+
+    // Cancellation (distinct from rejection)
+    public string? CancellationReason { get; set; }
 }

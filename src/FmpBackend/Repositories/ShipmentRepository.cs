@@ -81,4 +81,33 @@ public class ShipmentRepository
 
     await _db.SaveChangesAsync();
 }
+// ← NEW: returns every shipment regardless of status (admin use)
+    public async Task<List<Shipment>> GetAllAsync()
+    {
+        return await _db.Shipments
+            .OrderByDescending(s => s.CreatedAt)
+            .ToListAsync();
+    }
+ public async Task<int> CountByStatusAsync(string status)
+    {
+        return await _db.Shipments.CountAsync(s => s.Status == status);
+    }
+ 
+    // ← NEW: used by SysAdminService metrics
+    public async Task<int> CountAdminOverridesAsync()
+    {
+        return await _db.Shipments.CountAsync(s => s.UpdatedByAdmin);
+    }
+ 
+    // ← NEW: used by SysAdminService force-assign to stamp admin fields
+    public async Task SetAdminOverrideAsync(Guid shipmentId, Guid adminUserId)
+    {
+        var shipment = await _db.Shipments.FindAsync(shipmentId);
+        if (shipment == null) return;
+        shipment.UpdatedByAdmin  = true;
+        shipment.AdminOverrideBy = adminUserId;
+        shipment.AdminOverrideAt = DateTime.UtcNow;
+        shipment.UpdatedAt       = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+    }
 }

@@ -13,39 +13,52 @@ import 'package:fmp_app/presentation/driver/dashboard/driver_dashboard_screen.da
 import 'package:fmp_app/presentation/sender/dashboard/sender_dashboard.dart';
 import 'package:fmp_app/presentation/fleetmgr/dashboard/fleet_dashboard_screen.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/sys_admin_dashboard_screen.dart';
+// TODO: add these imports once the screens exist
+import 'package:fmp_app/presentation/driver/queue/driver_queue_screen.dart';
+import 'package:fmp_app/presentation/sender/create/sender_create_shipment_screen.dart';
+import 'package:fmp_app/presentation/driver/trips/driver_trip_detail_screen.dart';
 import '../app_session.dart';
+
 class AppRouter {
-  static const welcome          = '/welcome';
-  static const phone            = '/phone';
-  static const otp              = '/otp';
-  static const resolver         = '/resolver';
-  static const roleSelection    = '/role-selection';
-  static const driverOnboarding = '/driver-onboarding';
-  static const senderOnboarding = '/sender-onboarding';
-  static const driverBasic      = '/driver-basic';
-  static const driverDocs       = '/driver-docs';
-  static const approvalPending  = '/approval-pending';
-  static const driverDashboard  = '/driver-dashboard';
+  static const welcome           = '/welcome';
+  static const phone             = '/phone';
+  static const otp               = '/otp';
+  static const resolver          = '/resolver';
+  static const roleSelection     = '/role-selection';
+  static const driverOnboarding  = '/driver-onboarding';
+  static const senderOnboarding  = '/sender-onboarding';
+  static const driverBasic       = '/driver-basic';
+  static const driverDocs        = '/driver-docs';
+  static const driverQueue       = '/driver-queue';
+  static const tripDetail        = '/trip-detail';        // new
+  static const approvalPending   = '/approval-pending';
+  static const driverDashboard   = '/driver-dashboard';
   static const sendrecvDashboard = '/organizationuser';
-  static const fleetOnboarding  = '/fleet-onboarding';
-  static const fleetDashboard   = '/fleet-dashboard';
-  static const unionDashboard   = '/union-dashboard';
-  static const sysadmin         = '/system_admin';
+  static const createShipment    = '/create-shipment';    // new
+  static const fleetOnboarding   = '/fleet-onboarding';
+  static const fleetDashboard    = '/fleet-dashboard';
+  static const unionDashboard    = '/union-dashboard';
+  static const sysadmin          = '/system_admin';
 
   static final routes = <String, WidgetBuilder>{
-    welcome:          (_) => const WelcomeScreen(),
-    phone:            (_) => const PhoneInputScreen(),
-    otp:              (_) => const OtpVerifyScreen(),
-    resolver:         (_) => const AccountResolverScreen(),
-    roleSelection:    (_) => const RoleSelectionScreen(),
-    senderOnboarding: (_) => const SenderOnboardingScreen(),
-    fleetOnboarding:  (_) => const FleetmgrOnboardingScreen(),
-    driverBasic:      (_) => const DriverBasicDetailsScreen(),
-    approvalPending:  (_) => const ApprovalPendingScreen(),
-    driverDashboard:  (_) => const DriverDashboardScreen(),
-    sendrecvDashboard:(_) => const SenderDashboardScreen(),
-    fleetDashboard:   (_) => const FleetDashboardScreen(),
-    sysadmin:         (_) => const SysAdminDashboardScreen(),
-    unionDashboard:   (_) => UnionDashboardScreen(driverId:AppSession.driverId ?? ''),
+    welcome:           (_) => const WelcomeScreen(),
+    phone:             (_) => const PhoneInputScreen(),
+    otp:               (_) => const OtpVerifyScreen(),
+    resolver:          (_) => const AccountResolverScreen(),
+    roleSelection:     (_) => const RoleSelectionScreen(),
+    senderOnboarding:  (_) => const SenderOnboardingScreen(),
+    fleetOnboarding:   (_) => const FleetmgrOnboardingScreen(),
+    driverBasic:       (_) => const DriverBasicScreen(),
+    approvalPending:   (_) => const ApprovalPendingScreen(),
+    driverDashboard:   (_) => const DriverDashboardScreen(),
+    sendrecvDashboard: (_) => const SenderDashboardScreen(),
+    fleetDashboard:    (_) => const FleetDashboardScreen(),
+    sysadmin:          (_) => const SysAdminDashboardScreen(),
+    unionDashboard:    (_) => UnionDashboardScreen(driverId: AppSession.driverId ?? ''),
+    // Uncomment once screens are created:
+    driverQueue:    (_) => const DriverQueueScreen(),
+    tripDetail:     (_) => const DriverTripDetailScreen(),
+    createShipment: (_) => const SenderCreateShipmentScreen(),
+    //driverOnboarding: (_) => const DriverOnboardingScreen(),
   };
 }

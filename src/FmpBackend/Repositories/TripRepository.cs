@@ -1,7 +1,7 @@
 using System.Linq;
 using FmpBackend.Data;
 using FmpBackend.Models;
-
+using Microsoft.EntityFrameworkCore;
 namespace FmpBackend.Repositories;
 
 public class TripRepository
@@ -23,5 +23,11 @@ public class TripRepository
     public int CountTripsWithIssuesForFleetOwner(System.Guid fleetOwnerId)
     {
         return _db.Trips.Count(t => t.AssignedFleetOwnerId == fleetOwnerId && t.HasIssues);
+    }
+
+        public async Task<int> CountActiveAsync()
+    {
+        return await _db.Trips.CountAsync(t =>
+            t.CurrentStatus != "completed" && t.CurrentStatus != "cancelled");
     }
 }

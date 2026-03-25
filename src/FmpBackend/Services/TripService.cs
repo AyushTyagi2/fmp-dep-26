@@ -1,6 +1,8 @@
 using FmpBackend.Dtos;
 using FmpBackend.Models;
 using FmpBackend.Repositories;
+using FmpBackend.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace FmpBackend.Services;
 
@@ -8,11 +10,13 @@ public class TripService
 {
     private readonly TripCrudRepository _repo;
     private readonly ShipmentRepository _shipmentRepo;
+    private readonly AppDbContext       _db;
 
-    public TripService(TripCrudRepository repo, ShipmentRepository shipmentRepo)
+    public TripService(TripCrudRepository repo, ShipmentRepository shipmentRepo, AppDbContext db)
     {
-        _repo = repo;
+        _repo         = repo;
         _shipmentRepo = shipmentRepo;
+        _db           = db;
     }
 
     public async Task<PagedResult<TripDto>> GetAllAsync(int page, int pageSize, string? status)
@@ -88,11 +92,14 @@ public class TripService
         if (req.Status == "in_transit")
             trip.ActualStartTime = DateTime.UtcNow;
 
+        var terminalStatuses = new[] { "delivered", "completed", "cancelled" };
+        bool isTerminal = terminalStatuses.Contains(req.Status);
+
         if (req.Status == "delivered")
         {
             trip.ActualEndTime = DateTime.UtcNow;
-            trip.DeliveredAt = DateTime.UtcNow;
-            trip.CompletedAt = DateTime.UtcNow;
+            trip.DeliveredAt   = DateTime.UtcNow;
+            trip.CompletedAt   = DateTime.UtcNow;
         }
 
         trip.UpdatedAt = DateTime.UtcNow;
@@ -100,6 +107,34 @@ public class TripService
 
         // ✅ Sync shipment status whenever trip moves forward
         await _shipmentRepo.UpdateStatusAsync(trip.ShipmentId, req.Status);
+
+        // ✅ When a trip reaches a terminal state, free up the driver so they
+        //    can re-enter the queue for future shipments in the same event.
+        if (isTerminal && trip.DriverId != Guid.Empty)
+        {
+            var driver = await _db.Drivers.FindAsync(trip.DriverId);
+            if (driver != null)
+            {
+                driver.AvailabilityStatus = DriverAvailabilityStatus.Available;
+                await _db.SaveChangesAsync();
+            }
+
+            // Also reset any accepted DriverQueueEntry for the driver so they
+            // appear as "idle" again on the queue screen instead of "accepted".
+            var staleEntry = await _db.DriverQueueEntries
+                .Where(e => e.DriverId     == trip.DriverId
+                         && e.OfferStatus  == DriverOfferStatus.Accepted)
+                .OrderByDescending(e => e.ClaimWindowStart)
+                .FirstOrDefaultAsync();
+
+            if (staleEntry != null)
+            {
+                staleEntry.OfferStatus  = DriverOfferStatus.Idle;
+                staleEntry.HasClaimed   = false;
+                staleEntry.CurrentOfferedShipmentQueueId = null;
+                await _db.SaveChangesAsync();
+            }
+        }
 
         return true;
     }

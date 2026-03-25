@@ -19,8 +19,11 @@ public class ShipmentQueueRepository
 
     public async Task<(List<ShipmentQueue> items, int total)> GetWaitingAsync(int page, int pageSize)
     {
+        // Bug 3 fix: include 'offered' so shipments don't vanish from the list
+        // once AssignOffersAsync flips their status — they're still unaccepted.
         var q = WithIncludes()
-                    .Where(x => x.Status == "waiting")
+                    .Where(x => x.Status == ShipmentQueueStatus.Waiting
+                             || x.Status == ShipmentQueueStatus.Offered)
                     .OrderBy(x => x.CreatedAt);
         var total = await q.CountAsync();
         var items = await q.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
@@ -32,7 +35,9 @@ public class ShipmentQueueRepository
 
     public async Task<ShipmentQueue?> LockForAcceptAsync(Guid id) =>
         await _db.ShipmentQueues
-            .FromSqlRaw("SELECT * FROM shipment_queue WHERE id={0} AND status='waiting' FOR UPDATE SKIP LOCKED", id)
+            // Bug 5 fix: shipments are flipped to 'offered' by AssignOffersAsync before
+            // a driver can accept — the old query for status='waiting' always returned null.
+            .FromSqlRaw("SELECT * FROM shipment_queue WHERE id={0} AND status IN ('waiting','offered') FOR UPDATE SKIP LOCKED", id)
             .FirstOrDefaultAsync();
 
     public async Task AddAsync(ShipmentQueue item)

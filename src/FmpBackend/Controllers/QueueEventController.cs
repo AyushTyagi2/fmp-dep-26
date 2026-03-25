@@ -34,4 +34,30 @@ public class QueueEventsController : ControllerBase
             return Ok(new { active = false });
         return Ok(result);
     }
+    // POST /api/queue-events/reassign
+    [HttpPost("reassign")]
+    public async Task<IActionResult> Reassign()
+    {
+        var result = await _service.ReassignOffersAsync();
+        return Ok(result);
+    }
+
+    // GET /api/queue-events/live-status
+    // Returns whether a queue event is currently live (for Flutter to poll).
+    [HttpGet("live-status")]
+    public async Task<IActionResult> GetLiveStatus()
+    {
+        var result = await _service.GetLiveStatusAsync();
+        return Ok(result);
+    }
+
+    // POST /api/queue-events/{id}/toggle
+    // Toggles the queue event between live and closed.
+    [HttpPost("{id}/toggle")]
+    public async Task<IActionResult> ToggleQueueEvent(Guid id)
+    {
+        var result = await _service.ToggleQueueEventAsync(id);
+        if (result == null) return NotFound(new { message = "Queue event not found." });
+        return Ok(result);
+    }
 }

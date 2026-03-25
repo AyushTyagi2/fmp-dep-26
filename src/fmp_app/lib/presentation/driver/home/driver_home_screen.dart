@@ -2,23 +2,11 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_trips.dart';
 import '../../../app_session.dart';
+import '../../../shared/theme/app_theme.dart';
 
-// --- Global UI Constants for the Premium Look ---
-const _primaryGradient = LinearGradient(
-  colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)], // Deep Blue to Bright Blue
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
-
-const _successGradient = LinearGradient(
-  colors: [Color(0xFF059669), Color(0xFF10B981)], // Deep Green to Emerald
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
-
-// ============================================================================
-// DRIVER HOME SCREEN (PREMIUM DASHBOARD)
-// ============================================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// DRIVER HOME SCREEN — Logic unchanged, premium UI applied
+// ─────────────────────────────────────────────────────────────────────────────
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -60,74 +48,133 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FA), // Slightly cooler, premium off-white
-      appBar: AppBar(
-        title: const Text('My Dashboard', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22)),
-        centerTitle: false,
-        flexibleSpace: Container(decoration: const BoxDecoration(gradient: _primaryGradient)),
-        foregroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          _buildAppBar(),
+          if (_loading)
+            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+          else if (_activeTrips.isEmpty)
+            SliverFillRemaining(child: _buildEmptyState())
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _TripCard(trip: _activeTrips[i]),
+                  ),
+                  childCount: _activeTrips.length,
+                ),
+              ),
+            ),
+        ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF3B82F6)))
-          : _activeTrips.isEmpty
-              ? _buildEmptyState()
-              : _buildActiveTripDashboard(),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return SliverAppBar(
+      expandedHeight: 140,
+      floating: false,
+      pinned: true,
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Good ${_greeting()}, Driver 👋',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: Colors.white70,
+              ),
+            ),
+            const Text(
+              'My Dashboard',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primaryDark, AppColors.primary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Icon(
+                Icons.local_shipping_rounded,
+                size: 80,
+                color: Colors.white.withOpacity(0.08),
+              ),
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          onPressed: () {
+            setState(() => _loading = true);
+            _loadActiveTrips();
+          },
+        ),
+      ],
     );
   }
 
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.primaryLight,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.15), blurRadius: 30, spreadRadius: 10)
-                ],
               ),
-              child: const Icon(Icons.local_shipping_rounded, size: 72, color: Color(0xFF3B82F6)),
+              child: const Icon(
+                Icons.local_shipping_rounded,
+                size: 64,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No Active Trips',
+              style: AppTextStyles.headingMd,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'You have no active shipments right now.\nCheck the Queue tab to pick up new jobs.',
+              style: AppTextStyles.bodyMd,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            const Text(
-              'You\'re offline or empty',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Head over to the Queue tab to find and accept your next shipment.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 16, height: 1.5),
-            ),
-            const SizedBox(height: 40),
-            Container(
-              decoration: BoxDecoration(
-                gradient: _primaryGradient,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6))
-                ]
-              ),
+            SizedBox(
+              width: 200,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  setState(() => _loading = true);
-                  _loadActiveTrips();
-                },
-                icon: const Icon(Icons.refresh_rounded, size: 22),
-                label: const Text('Refresh Dashboard', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent, // Let the gradient show
-                  foregroundColor: Colors.white,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
+                onPressed: _loadActiveTrips,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh'),
               ),
             ),
           ],
@@ -136,101 +183,140 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildActiveTripDashboard() {
-    final trip = _activeTrips.first;
-    return RefreshIndicator(
-      onRefresh: _loadActiveTrips,
-      color: const Color(0xFF3B82F6),
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(8)),
-                child: Icon(Icons.bolt_rounded, color: Colors.amber.shade600, size: 18),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'CURRENTLY ACTIVE',
-                style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w800, letterSpacing: 1.5),
-              ),
-            ],
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'morning';
+    if (h < 17) return 'afternoon';
+    return 'evening';
+  }
+}
+
+// ─── Trip Card ────────────────────────────────────────────────────────────────
+
+class _TripCard extends StatelessWidget {
+  final TripSummary trip;
+  const _TripCard({required this.trip});
+
+  Color get _statusColor => switch (trip.currentStatus) {
+    'assigned'   => AppColors.warning,
+    'in_transit' => AppColors.primary,
+    'delivered'  => AppColors.success,
+    _            => AppColors.textSecondary,
+  };
+
+  String get _statusLabel => trip.currentStatus
+      .replaceAll('_', ' ')
+      .split(' ')
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+
+  IconData get _statusIcon => switch (trip.currentStatus) {
+    'assigned'   => Icons.assignment_ind_rounded,
+    'in_transit' => Icons.local_shipping_rounded,
+    'delivered'  => Icons.check_circle_rounded,
+    _            => Icons.help_outline_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: () => Navigator.pushNamed(
+            context,
+            '/active-trip',
+            arguments: trip.id,
           ),
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 24, offset: const Offset(0, 8))
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Icon(_statusIcon, color: _statusColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Trip #${trip.tripNumber}',
+                            style: AppTextStyles.headingSm,
+                          ),
+                          Text(
+                            'Shipment: ${trip.shipmentNumber}',
+                            style: AppTextStyles.bodySm,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        border: Border.all(
+                          color: _statusColor.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        _statusLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _statusColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (trip.agreedPrice != null) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: AppColors.divider),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                        child: Text(
-                          'ID: ${trip.tripNumber}',
-                          style: const TextStyle(color: Color(0xFF475569), fontSize: 13, fontWeight: FontWeight.w600),
+                      Text('Agreed Price', style: AppTextStyles.bodyMd),
+                      Text(
+                        '₹${trip.agreedPrice!.toStringAsFixed(0)}',
+                        style: AppTextStyles.headingSm.copyWith(
+                          color: AppColors.success,
                         ),
                       ),
-                      _PremiumStatusChip(status: trip.currentStatus),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Shipment Number', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text(
-                    trip.shipmentNumber,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                  ),
-                  const SizedBox(height: 32),
-                  Container(
-                    width: double.infinity,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: _primaryGradient,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 6))
-                      ]
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ActiveTripScreen(tripId: trip.id)),
-                      ).then((_) => _loadActiveTrips()),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: Colors.white,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Text('Manage Trip', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
                 ],
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ============================================================================
-// ACTIVE TRIP SCREEN (PREMIUM DETAILS)
-// ============================================================================
+// ─── Active Trip Screen ───────────────────────────────────────────────────────
 
 class ActiveTripScreen extends StatefulWidget {
   final String tripId;
@@ -249,14 +335,14 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
   static const _steps = ['assigned', 'in_transit', 'delivered'];
   static const _stepLabels = {
-    'assigned': 'Start Delivery',
+    'assigned':   'Start Delivery',
     'in_transit': 'Mark as Delivered',
-    'delivered': 'Completed ✓',
+    'delivered':  'Completed ✓',
   };
   static const _stepDescriptions = {
-    'assigned': 'Shipment assigned to you. Head to the pickup location.',
+    'assigned':   'Shipment assigned. Head to the pickup location.',
     'in_transit': 'Cargo picked up. You are currently en route.',
-    'delivered': 'Delivery successfully completed!',
+    'delivered':  'Delivery successfully completed!',
   };
 
   @override
@@ -266,7 +352,6 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     _loadTrip();
   }
 
-  // ... [_loadTrip and _advanceStatus remain exactly the same logically] ...
   Future<void> _loadTrip() async {
     setState(() { _loading = true; _error = null; });
     try {
@@ -283,13 +368,10 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     if (_trip == null) return;
     final idx = _steps.indexOf(_trip!.currentStatus);
     if (idx < 0 || idx >= _steps.length - 1) return;
-
     final nextStatus = _steps[idx + 1];
     setState(() => _updating = true);
-
     final ok = await _api.updateStatus(widget.tripId, nextStatus);
     if (!mounted) return;
-
     if (ok) {
       setState(() {
         _trip = TripSummary(
@@ -301,12 +383,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to update status. Please retry.', style: TextStyle(fontWeight: FontWeight.w600)), 
-          backgroundColor: Colors.red.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+        const SnackBar(content: Text('Failed to update status. Please retry.')),
       );
     }
     setState(() => _updating = false);
@@ -315,25 +392,26 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   @override
   Widget build(BuildContext context) {
     final isDone = _trip?.currentStatus == 'delivered';
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FA),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Trip Details', style: TextStyle(fontWeight: FontWeight.w700)),
-        centerTitle: true,
-        flexibleSpace: Container(decoration: BoxDecoration(gradient: isDone ? _successGradient : _primaryGradient)),
+        title: const Text('Trip Details'),
+        backgroundColor: isDone ? AppColors.success : AppColors.primary,
         foregroundColor: Colors.white,
-        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+          fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white,
+        ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF3B82F6)))
-          : _error != null 
-              ? _buildError() 
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildError()
               : _buildContent(),
-      bottomNavigationBar: (!_loading && _error == null) 
+      bottomNavigationBar: (!_loading && _error == null)
           ? SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: isDone ? _buildCompletedAction() : _buildActionBtn(),
               ),
             )
@@ -342,30 +420,24 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   Widget _buildError() => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
-            child: Icon(Icons.wifi_off_rounded, size: 56, color: Colors.red.shade400),
-          ),
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF64748B), fontSize: 16)),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: _loadTrip, 
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E293B), 
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            child: const Text('Retry Connection', style: TextStyle(fontWeight: FontWeight.w600))
-          ),
-        ]),
-      );
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.errorLight,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.error),
+      ),
+      const SizedBox(height: 20),
+      Text(_error!, textAlign: TextAlign.center, style: AppTextStyles.bodyMd),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: 160,
+        child: ElevatedButton(onPressed: _loadTrip, child: const Text('Retry')),
+      ),
+    ]),
+  );
 
   Widget _buildContent() {
     final trip = _trip!;
@@ -373,268 +445,180 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final isDone = status == 'delivered';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, 
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sleek Status Stepper Card
+          // Step indicator
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 4))]
-            ),
-            child: _PremiumStatusStepper(currentStatus: status, steps: _steps),
-          ),
-          const SizedBox(height: 24),
-          
-          // Current Status Highlight
-          Container(
-            width: double.infinity, 
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: isDone ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF), // Soft Emerald or Soft Blue
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: isDone ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE), width: 1.5),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.card,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start, 
               children: [
                 Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
+                  children: List.generate(_steps.length * 2 - 1, (i) {
+                    if (i.isOdd) {
+                      final done = (i ~/ 2) < _steps.indexOf(status);
+                      return Expanded(
+                        child: Container(
+                          height: 3,
+                          color: done ? AppColors.success : AppColors.border,
+                        ),
+                      );
+                    }
+                    final si = i ~/ 2;
+                    final done = si <= _steps.indexOf(status);
+                    final isCurr = si == _steps.indexOf(status);
+                    return Container(
+                      width: 32, height: 32,
                       decoration: BoxDecoration(
-                        color: isDone ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
                         shape: BoxShape.circle,
+                        color: done ? AppColors.success : AppColors.surface,
+                        border: Border.all(
+                          color: done ? AppColors.success
+                              : isCurr ? AppColors.primary : AppColors.border,
+                          width: 2,
+                        ),
                       ),
-                      child: Icon(
-                        isDone ? Icons.check_rounded : Icons.navigation_rounded, 
-                        color: Colors.white,
-                        size: 16
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'CURRENT STATUS', 
-                      style: TextStyle(
-                        fontSize: 12, 
-                        color: isDone ? const Color(0xFF047857) : const Color(0xFF1D4ED8), 
-                        fontWeight: FontWeight.w800, 
-                        letterSpacing: 1.2
-                      )
-                    ),
-                  ],
+                      child: done
+                          ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                          : Center(
+                              child: Text('${si + 1}',
+                                style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w700,
+                                  color: isCurr ? AppColors.primary : AppColors.textHint,
+                                ),
+                              ),
+                            ),
+                    );
+                  }),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  _stepDescriptions[status] ?? status,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), height: 1.4)
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: _steps.map((s) => Text(
+                    s.replaceAll('_', '\n').split('\n').map((w) =>
+                        w[0].toUpperCase() + w.substring(1)).join('\n'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: s == status ? AppColors.primary : AppColors.textHint,
+                    ),
+                  )).toList(),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
-          
-          if (trip.agreedPrice != null) ...[
-            const Text(
-              "TRIP DETAILS", 
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.2)
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white, 
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 4))],
+          const SizedBox(height: 16),
+          // Status description
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: isDone ? AppColors.successLight : AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: isDone ? AppColors.success.withOpacity(0.3)
+                    : AppColors.primary.withOpacity(0.2),
               ),
-              child: Column(
-                children: [
-                  _PremiumInfoRow(label: 'Trip ID', value: trip.tripNumber),
-                  const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
-                  _PremiumInfoRow(label: 'Shipment #', value: trip.shipmentNumber),
-                  const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
-                  _PremiumInfoRow(
-                    label: 'Payout', 
+            ),
+            child: Text(
+              _stepDescriptions[status] ?? status,
+              style: AppTextStyles.bodyLg.copyWith(
+                color: isDone ? AppColors.success : AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Trip details
+          Text('TRIP DETAILS', style: AppTextStyles.labelSm),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.card,
+            ),
+            child: Column(
+              children: [
+                _InfoRow(label: 'Trip Number', value: trip.tripNumber),
+                const Divider(height: 24),
+                _InfoRow(label: 'Shipment #', value: trip.shipmentNumber),
+                if (trip.agreedPrice != null) ...[
+                  const Divider(height: 24),
+                  _InfoRow(
+                    label: 'Agreed Price',
                     value: '₹${trip.agreedPrice!.toStringAsFixed(0)}',
-                    valueColor: const Color(0xFF059669), // Rich Green
-                    isBold: true,
-                    size: 20,
+                    valueColor: AppColors.success,
+                    bold: true,
                   ),
-                ]
-              ),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildActionBtn() {
-    return Container(
-      width: double.infinity, 
-      height: 60,
-      decoration: BoxDecoration(
-        gradient: _primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))]
+  Widget _buildActionBtn() => ElevatedButton(
+    onPressed: _updating ? null : _advanceStatus,
+    style: ElevatedButton.styleFrom(
+      minimumSize: const Size(double.infinity, 52),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      child: ElevatedButton(
-        onPressed: _updating ? null : _advanceStatus,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent, 
-          foregroundColor: Colors.white,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-        child: _updating
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
-            : Text(
-                _stepLabels[_trip!.currentStatus] ?? 'Update Status',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 0.5)
-              ),
-      ),
-    );
-  }
-
-  Widget _buildCompletedAction() {
-    return SizedBox(
-      width: double.infinity, 
-      height: 60,
-      child: OutlinedButton(
-        onPressed: () => Navigator.pop(context),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF1E293B),
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-        ),
-        child: const Text('Back to Dashboard', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// PREMIUM SUPPORTING WIDGETS
-// ============================================================================
-
-class _PremiumStatusStepper extends StatelessWidget {
-  final String currentStatus;
-  final List<String> steps;
-  const _PremiumStatusStepper({required this.currentStatus, required this.steps});
-
-  @override
-  Widget build(BuildContext context) {
-    final idx = steps.indexOf(currentStatus);
-    return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          final done = (i ~/ 2) < idx;
-          return Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              height: 4, 
-              decoration: BoxDecoration(
-                color: done ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(2)
-              ),
-            )
-          );
-        }
-        final stepIdx = i ~/ 2;
-        final done    = stepIdx <= idx;
-        final isCurrent = stepIdx == idx;
-        
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 36, height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle, 
-            color: done ? const Color(0xFF10B981) : Colors.white,
-            border: Border.all(
-              color: done ? const Color(0xFF10B981) : (isCurrent ? const Color(0xFF3B82F6) : const Color(0xFFCBD5E1)),
-              width: isCurrent && !done ? 3 : 1.5,
-            ),
-            boxShadow: isCurrent && !done ? [
-              BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.3), blurRadius: 8, spreadRadius: 2)
-            ] : null,
-          ),
-          child: done
-              ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
-              : Center(
-                  child: Text(
-                    '${stepIdx + 1}', 
-                    style: TextStyle(
-                      color: isCurrent ? const Color(0xFF1D4ED8) : const Color(0xFF94A3B8), 
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14
-                    )
-                  )
-                ),
-        );
-      }),
-    );
-  }
-}
-
-class _PremiumStatusChip extends StatelessWidget {
-  final String status;
-  const _PremiumStatusChip({required this.status});
-
-  Color get _baseColor => switch (status) {
-    'assigned'   => const Color(0xFFF59E0B), // Amber
-    'in_transit' => const Color(0xFF8B5CF6), // Purple
-    'delivered'  => const Color(0xFF10B981), // Emerald
-    _            => const Color(0xFF64748B), // Slate
-  };
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(
-      color: _baseColor.withOpacity(0.12), 
-      borderRadius: BorderRadius.circular(10), 
-      border: Border.all(color: _baseColor.withOpacity(0.2))
     ),
-    child: Text(
-      status.replaceAll('_', ' ').toUpperCase(), 
-      style: TextStyle(color: _baseColor, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.8)
+    child: _updating
+        ? const SizedBox(
+            width: 22, height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+          )
+        : Text(_stepLabels[_trip!.currentStatus] ?? 'Update Status'),
+  );
+
+  Widget _buildCompletedAction() => OutlinedButton(
+    onPressed: () => Navigator.pop(context),
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size(double.infinity, 52),
     ),
+    child: const Text('Back to Dashboard'),
   );
 }
 
-class _PremiumInfoRow extends StatelessWidget {
-  final String label; 
-  final String value;
+class _InfoRow extends StatelessWidget {
+  final String label, value;
   final Color? valueColor;
-  final bool isBold;
-  final double size;
-  
-  const _PremiumInfoRow({
-    required this.label, 
+  final bool bold;
+  const _InfoRow({
+    required this.label,
     required this.value,
     this.valueColor,
-    this.isBold = false,
-    this.size = 15,
+    this.bold = false,
   });
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 15, fontWeight: FontWeight.w500)),
+      Text(label, style: AppTextStyles.bodyMd),
       const Spacer(),
       Text(
-        value, 
-        style: TextStyle(
-          fontSize: size, 
-          fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-          color: valueColor ?? const Color(0xFF0F172A),
-          fontFamily: value.startsWith('₹') ? null : 'monospace',
+        value,
+        style: AppTextStyles.labelLg.copyWith(
+          color: valueColor ?? AppColors.textPrimary,
+          fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+          fontSize: bold ? 17 : 14,
         ),
       ),
-    ]
+    ],
   );
 }

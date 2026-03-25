@@ -1,6 +1,6 @@
 using FmpBackend.Data;
 using FmpBackend.Models;
-
+using Microsoft.EntityFrameworkCore;
 namespace FmpBackend.Repositories;
 
 public class DriverRepository
@@ -32,5 +32,9 @@ public class DriverRepository
         _db.Drivers.Add(driver);
         _db.SaveChanges();
         return driver;
+    }
+    public async Task<int> CountActiveAsync()
+    {
+        return await _db.Drivers.CountAsync(d => d.Status == "active");
     }
 }

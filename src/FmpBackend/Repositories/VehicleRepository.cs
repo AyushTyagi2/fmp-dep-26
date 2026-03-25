@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using FmpBackend.Data;
 using FmpBackend.Models;
 
@@ -15,6 +16,12 @@ public class VehicleRepository
     public Vehicle? GetByRegistration(string reg)
     {
         return _db.Vehicles.FirstOrDefault(v => v.RegistrationNumber == reg);
+    }
+
+    // ← NEW: used by SysAdminService force-assign
+    public Vehicle? GetById(Guid id)
+    {
+        return _db.Vehicles.FirstOrDefault(v => v.Id == id);
     }
 
     public Vehicle? GetByCurrentDriverId(Guid driverId)
@@ -35,9 +42,10 @@ public class VehicleRepository
         _db.SaveChanges();
     }
 
-    public int CountVehiclesWithIssuesForFleetOwner(System.Guid fleetOwnerId)
+    public int CountVehiclesWithIssuesForFleetOwner(Guid fleetOwnerId)
     {
-        // Treat non-active status or not-available as issues
-        return _db.Vehicles.Count(v => v.FleetOwnerId == fleetOwnerId && (v.Status != "active" || v.AvailabilityStatus != "available"));
+        return _db.Vehicles.Count(v =>
+            v.FleetOwnerId == fleetOwnerId &&
+            (v.Status != "active" || v.AvailabilityStatus != "available"));
     }
 }

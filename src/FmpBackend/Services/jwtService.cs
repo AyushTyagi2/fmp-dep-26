@@ -20,9 +20,12 @@ public class JwtService
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            claims: [
+            claims:
+            [
                 new Claim("phone", phone),
                 new Claim("role",  role),
+                // ClaimTypes.Role is what [Authorize(Roles = "...")] reads
+                new Claim(ClaimTypes.Role, role.ToUpperInvariant()),
             ],
             expires: DateTime.UtcNow.AddDays(30),
             signingCredentials: creds

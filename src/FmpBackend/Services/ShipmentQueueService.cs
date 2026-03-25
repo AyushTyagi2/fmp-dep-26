@@ -13,17 +13,20 @@ public class ShipmentQueueService
     private readonly AppDbContext                  _db;
     private readonly TripService                   _tripService;
     private readonly IHubContext<ShipmentQueueHub> _hub;
+    private readonly QueueEventService             _queueEventService;
 
     public ShipmentQueueService(
         ShipmentQueueRepository       repo,
         AppDbContext                  db,
         TripService                   tripService,
-        IHubContext<ShipmentQueueHub> hub)
+        IHubContext<ShipmentQueueHub> hub,
+        QueueEventService             queueEventService)
     {
-        _repo        = repo;
-        _db          = db;
-        _tripService = tripService;
-        _hub         = hub;
+        _repo               = repo;
+        _db                 = db;
+        _tripService        = tripService;
+        _hub                = hub;
+        _queueEventService  = queueEventService;
     }
 
     // ─── List ────────────────────────────────────────────────────────────────
@@ -77,10 +80,7 @@ public class ShipmentQueueService
 
         if (activeEvent != null)
         {
-            // Resolve circular dep via DI scope — QueueEventService is injected separately
-            // to avoid circular dependency; caller (controller) handles this.
-            // Signal the hub so the matching worker can pick it up.
-            await _hub.Clients.All.SendAsync("NewShipmentQueued", item.Id);
+            await _queueEventService.AssignOffersAsync(activeEvent);
         }
 
         return dto;
@@ -253,16 +253,14 @@ public class ShipmentQueueService
             await _db.SaveChangesAsync();
         }
 
-        // Clear driver's current offer so they become idle
+        // Clear driver's current offer so they become idle for the next available shipment
+        // Bug 4 fix: reset to Idle (not Passed) so AssignOffersAsync will re-match this driver
         entry.CurrentOfferedShipmentQueueId = null;
-        entry.OfferStatus                   = DriverOfferStatus.Passed;
+        entry.OfferStatus                   = DriverOfferStatus.Idle;
         await _db.SaveChangesAsync();
 
-        // Re-run matching to cascade this shipment to the next driver
-        // and potentially assign a new shipment to this driver
-        var queueEventService = new QueueEventService(
-            null!, null!, null!, _db);   // only AssignOffersAsync uses _db
-        await queueEventService.AssignOffersAsync(activeEvent);
+        // Bug 2 fix: use the injected QueueEventService instead of newing it with null! deps
+        await _queueEventService.AssignOffersAsync(activeEvent);
 
         await _hub.Clients.All.SendAsync("OfferUpdated", driverId);
         return (true, null);

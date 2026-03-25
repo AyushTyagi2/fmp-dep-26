@@ -122,16 +122,80 @@ public class QueueEventService
 
         if (!availableShipments.Any()) return;
 
+        // Build a lookup of (driverId, shipmentQueueId) pairs that have already
+        // been offered and rejected/expired.  A shipment cascades to the next
+        // driver in position order, but if EVERY eligible driver has already
+        // passed/expired on a shipment it gets re-circulated from the top so
+        // it is never permanently stuck.
+        var allHistory = await _db.ShipmentQueueAssignments
+            .Where(a => a.QueueEventId == queueEvent.Id
+                     && (a.Outcome == AssignmentOutcome.Passed
+                      || a.Outcome == AssignmentOutcome.Expired))
+            .Select(a => new { a.DriverId, a.ShipmentQueueId })
+            .ToListAsync();
+
+        // Per-shipment: set of driver IDs that have already rejected it
+        var rejectedByShipment = allHistory
+            .GroupBy(p => p.ShipmentQueueId)
+            .ToDictionary(g => g.Key, g => g.Select(p => p.DriverId).ToHashSet());
+
+        // All eligible (non-claimed) driver IDs in this event
+        var allEligibleDriverIds = await _db.DriverQueueEntries
+            .Where(e => e.QueueEventId == queueEvent.Id && !e.HasClaimed)
+            .Select(e => e.DriverId)
+            .ToListAsync();
+
+        // A shipment is "exhausted" only if every eligible driver has already
+        // passed/expired on it — in that case, reset its rejection history so
+        // it re-circulates from the top of the queue.
+        var exhaustedShipmentIds = rejectedByShipment
+            .Where(kv => allEligibleDriverIds.All(id => kv.Value.Contains(id)))
+            .Select(kv => kv.Key)
+            .ToHashSet();
+
+        // For exhausted shipments, clear their history so they are re-offerable
+        if (exhaustedShipmentIds.Any())
+        {
+            var staleRecords = await _db.ShipmentQueueAssignments
+                .Where(a => a.QueueEventId == queueEvent.Id
+                         && exhaustedShipmentIds.Contains(a.ShipmentQueueId)
+                         && (a.Outcome == AssignmentOutcome.Passed
+                          || a.Outcome == AssignmentOutcome.Expired))
+                .ToListAsync();
+            _db.ShipmentQueueAssignments.RemoveRange(staleRecords);
+            await _db.SaveChangesAsync();
+
+            // Rebuild without the exhausted entries
+            allHistory = allHistory
+                .Where(p => !exhaustedShipmentIds.Contains(p.ShipmentQueueId))
+                .ToList();
+            foreach (var id in exhaustedShipmentIds)
+                rejectedByShipment.Remove(id);
+        }
+
+        var seenSet = allHistory
+            .Select(p => (p.DriverId, p.ShipmentQueueId))
+            .ToHashSet();
+
         var now        = DateTime.UtcNow;
         var expiresAt  = now.AddSeconds(queueEvent.WindowSeconds);
-
-        var pairs = Math.Min(idleDriverEntries.Count, availableShipments.Count);
         var newAssignments = new List<ShipmentQueueAssignment>();
 
-        for (int i = 0; i < pairs; i++)
+        // Track which shipments have been matched in this pass so we don't
+        // double-assign the same shipment to two drivers.
+        var matchedShipmentIds = new HashSet<Guid>();
+
+        foreach (var entry in idleDriverEntries)
         {
-            var entry    = idleDriverEntries[i];
-            var shipment = availableShipments[i];
+            // Find the oldest waiting shipment this driver hasn't already
+            // passed on or let expire.
+            var shipment = availableShipments.FirstOrDefault(s =>
+                !matchedShipmentIds.Contains(s.Id) &&
+                !seenSet.Contains((entry.DriverId, s.Id)));
+
+            if (shipment == null) continue; // no eligible shipment for this driver right now
+
+            matchedShipmentIds.Add(shipment.Id);
 
             // Mark the driver as having a pending offer
             entry.CurrentOfferedShipmentQueueId = shipment.Id;
@@ -155,8 +219,11 @@ public class QueueEventService
             });
         }
 
-        _db.ShipmentQueueAssignments.AddRange(newAssignments);
-        await _db.SaveChangesAsync();
+        if (newAssignments.Any())
+        {
+            _db.ShipmentQueueAssignments.AddRange(newAssignments);
+            await _db.SaveChangesAsync();
+        }
     }
 
     // ─── GET active event slot for a driver ──────────────────────────────────
@@ -180,6 +247,91 @@ public class QueueEventService
                                    && e.DriverId == driverId);
 
         if (entry == null) return null;
+
+        // ── Self-heal: if the entry says "accepted" but the driver has no
+        //    active trip (they finished it), reset to idle so they can
+        //    participate in the queue again without waiting for a restart.
+        if (entry.OfferStatus == DriverOfferStatus.Accepted || entry.HasClaimed)
+        {
+            var hasActiveTrip = await _db.Trips.AnyAsync(t =>
+                t.DriverId == driverId &&
+                TripStatus.ActiveStatuses.Contains(t.CurrentStatus));
+
+            if (!hasActiveTrip)
+            {
+                entry.OfferStatus  = DriverOfferStatus.Idle;
+                entry.HasClaimed   = false;
+                entry.CurrentOfferedShipmentQueueId = null;
+                await _db.SaveChangesAsync();
+
+                // ── Immediately try to match this now-idle driver with a
+                //    waiting shipment. Without this call the driver would sit
+                //    on "Waiting for offer" indefinitely until the background
+                //    worker next fires, even though shipments may be queued.
+                await AssignOffersAsync(activeEvent);
+
+                // Re-fetch the entry so the offer fields reflect the new match.
+                entry = await _db.DriverQueueEntries
+                    .Include(e => e.CurrentOfferedShipment)
+                        .ThenInclude(s => s!.Shipment)
+                            .ThenInclude(s => s.PickupAddress)
+                    .Include(e => e.CurrentOfferedShipment)
+                        .ThenInclude(s => s!.Shipment)
+                            .ThenInclude(s => s.DropAddress)
+                    .FirstAsync(e => e.QueueEventId == activeEvent.Id
+                                  && e.DriverId == driverId);
+            }
+        }
+
+        // ── Self-heal: if the pending offer has already expired (background
+        //    worker hasn't cleaned it up yet), mark it expired and re-match
+        //    immediately so the driver doesn't see a permanently-expired card.
+        if (entry.OfferStatus == DriverOfferStatus.Pending
+         && entry.CurrentOfferedShipment?.OfferExpiresAt != null
+         && entry.CurrentOfferedShipment.OfferExpiresAt < DateTime.UtcNow)
+        {
+            var staleShipment = entry.CurrentOfferedShipment;
+            entry.OfferStatus                   = DriverOfferStatus.Expired;
+            entry.CurrentOfferedShipmentQueueId = null;
+            staleShipment.Status                = ShipmentQueueStatus.Waiting;
+            staleShipment.CurrentDriverId       = null;
+            staleShipment.OfferExpiresAt        = null;
+            await _db.SaveChangesAsync();
+
+            await AssignOffersAsync(activeEvent);
+
+            entry = await _db.DriverQueueEntries
+                .Include(e => e.CurrentOfferedShipment)
+                    .ThenInclude(s => s!.Shipment)
+                        .ThenInclude(s => s.PickupAddress)
+                .Include(e => e.CurrentOfferedShipment)
+                    .ThenInclude(s => s!.Shipment)
+                        .ThenInclude(s => s.DropAddress)
+                .FirstAsync(e => e.QueueEventId == activeEvent.Id
+                              && e.DriverId == driverId);
+        }
+
+        // ── Self-heal: driver is idle/passed/expired with no pending offer.
+        //    Try to match them immediately so they don't wait up to 30s for
+        //    the background worker when a shipment is already waiting.
+        if (entry.CurrentOfferedShipmentQueueId == null
+         && (entry.OfferStatus == DriverOfferStatus.Idle
+          || entry.OfferStatus == DriverOfferStatus.Passed
+          || entry.OfferStatus == DriverOfferStatus.Expired)
+         && !entry.HasClaimed)
+        {
+            await AssignOffersAsync(activeEvent);
+
+            entry = await _db.DriverQueueEntries
+                .Include(e => e.CurrentOfferedShipment)
+                    .ThenInclude(s => s!.Shipment)
+                        .ThenInclude(s => s.PickupAddress)
+                .Include(e => e.CurrentOfferedShipment)
+                    .ThenInclude(s => s!.Shipment)
+                        .ThenInclude(s => s.DropAddress)
+                .FirstAsync(e => e.QueueEventId == activeEvent.Id
+                              && e.DriverId == driverId);
+        }
 
         CurrentOfferDto? currentOffer = null;
         if (entry.CurrentOfferedShipmentQueueId != null
@@ -215,4 +367,71 @@ public class QueueEventService
 
     private static string FormatAddress(Address? a) =>
         a == null ? "Unknown" : $"{a.City}, {a.State}";
+
+
+    public async Task<object> ReassignOffersAsync()
+    {
+        var activeEvent = await _db.QueueEvents
+            .FirstOrDefaultAsync(e => e.Status == QueueEventStatus.Live
+                                   && e.EndTime > DateTime.UtcNow);
+        if (activeEvent != null)
+        {
+            await AssignOffersAsync(activeEvent);
+        }
+        if (activeEvent == null) return new { message = "No active event" };
+        await AssignOffersAsync(activeEvent);
+        return new { message = "Offers reassigned" };
+    }
+
+    // ─── GET live status (for Flutter to poll) ───────────────────────────────
+
+    public async Task<object> GetLiveStatusAsync()
+    {
+        var activeEvent = await _db.QueueEvents
+            .Where(e => e.Status == QueueEventStatus.Live && e.EndTime > DateTime.UtcNow)
+            .OrderByDescending(e => e.StartTime)
+            .FirstOrDefaultAsync();
+
+        if (activeEvent == null)
+            return new { isLive = false, eventId = (Guid?)null, endTime = (DateTime?)null };
+
+        return new
+        {
+            isLive  = true,
+            eventId = (Guid?)activeEvent.Id,
+            endTime = (DateTime?)activeEvent.EndTime
+        };
+    }
+
+    // ─── TOGGLE queue event live / closed ────────────────────────────────────
+
+    public async Task<object?> ToggleQueueEventAsync(Guid id)
+    {
+        var queueEvent = await _db.QueueEvents.FindAsync(id);
+        if (queueEvent == null) return null;
+
+        if (queueEvent.Status == QueueEventStatus.Live)
+        {
+            queueEvent.Status = QueueEventStatus.Closed;
+        }
+        else
+        {
+            // Re-open: extend end time to 2 hours from now if it has passed
+            if (queueEvent.EndTime <= DateTime.UtcNow)
+                queueEvent.EndTime = DateTime.UtcNow.AddHours(2);
+            queueEvent.Status = QueueEventStatus.Live;
+            // Re-assign offers for any waiting shipments
+            await AssignOffersAsync(queueEvent);
+        }
+
+        await _db.SaveChangesAsync();
+
+        return new
+        {
+            eventId = queueEvent.Id,
+            status  = queueEvent.Status,
+            endTime = queueEvent.EndTime
+        };
+    }
+
 }

@@ -1,29 +1,33 @@
 using FmpBackend.Dtos;
 using FmpBackend.Models;
 using FmpBackend.Repositories;
+using System.Text.Json;
 
 namespace FmpBackend.Services;
 
 public class ShipmentService
 {
-    private readonly ShipmentRepository _ship;
+    private readonly ShipmentRepository    _ship;
     private readonly OrganizationRepository _orgRepo;
-    private readonly UserRepository _userRepo;
-    private readonly AddressRepository _addressRepo;
-    private readonly ShipmentQueueService _queueService;
+    private readonly UserRepository         _userRepo;
+    private readonly AddressRepository      _addressRepo;
+    private readonly ShipmentQueueService   _queueService;
+    private readonly SystemLogService       _log;           // ← NEW
 
     public ShipmentService(
-        ShipmentRepository ship,
+        ShipmentRepository    ship,
         OrganizationRepository orgRepo,
-        UserRepository userRepo,
-        AddressRepository addressRepo,
-        ShipmentQueueService queueService)
+        UserRepository         userRepo,
+        AddressRepository      addressRepo,
+        ShipmentQueueService   queueService,
+        SystemLogService       log)            // ← NEW
     {
-        _ship = ship;
-        _orgRepo = orgRepo;
-        _userRepo = userRepo;
-        _addressRepo = addressRepo;
+        _ship         = ship;
+        _orgRepo      = orgRepo;
+        _userRepo     = userRepo;
+        _addressRepo  = addressRepo;
         _queueService = queueService;
+        _log          = log;
     }
 
     public async Task<Shipment> CreateShipmentAsync(CreateShipmentRequest request)
@@ -42,47 +46,43 @@ public class ShipmentService
         if (user == null)
             throw new Exception("User not found");
 
-        var pickupAddress = await _addressRepo
-            .GetDefaultByOwnerAsync(senderOrg.Id, "organization");
+        var pickupAddress = await _addressRepo.GetDefaultByOwnerAsync(senderOrg.Id, "organization");
         if (pickupAddress == null)
             throw new Exception("Pickup address not found");
 
-        var dropAddress = await _addressRepo
-            .GetDefaultByOwnerAsync(receiverOrg.Id, "organization");
+        var dropAddress = await _addressRepo.GetDefaultByOwnerAsync(receiverOrg.Id, "organization");
         if (dropAddress == null)
             throw new Exception("Drop address not found");
 
         var shipment = new Shipment
         {
-            Id = Guid.NewGuid(),
-            ShipmentNumber = shipmentNumber,
-            SenderOrganizationId = senderOrg.Id,
-            ReceiverOrganizationId = receiverOrg.Id,
-            CreatedByUserId = user.Id,
-            PickupAddressId = pickupAddress.Id,
-            DropAddressId = dropAddress.Id,
-            CargoType = request.CargoType,
-            CargoDescription = request.CargoDescription,
-            CargoWeightKg = request.CargoWeightKg,
-            CargoVolumeCubicMeters = request.CargoVolumeCubicMeters,
-            PackageCount = request.PackageCount,
-            RequiresRefrigeration = request.RequiresRefrigeration,
-            RequiresInsurance = request.RequiresInsurance,
-            SpecialHandlingInstructions = request.SpecialHandlingInstructions,
-            PreferredPickupDate = request.PreferredPickupDate.HasValue
-    ? DateTime.SpecifyKind(request.PreferredPickupDate.Value, DateTimeKind.Utc)
-    : null,
-PreferredDeliveryDate = request.PreferredDeliveryDate.HasValue
-    ? DateTime.SpecifyKind(request.PreferredDeliveryDate.Value, DateTimeKind.Utc)
-    : null,
-            IsUrgent = request.IsUrgent,
-            AgreedPrice = request.AgreedPrice,
-            PricePerUnit = request.PricePerUnit,
-            LoadingCharges = request.LoadingCharges,
-            UnloadingCharges = request.UnloadingCharges,
-            OtherCharges = request.OtherCharges,
-            Status = "pending_approval",
-            CreatedAt = DateTime.UtcNow
+            Id                           = Guid.NewGuid(),
+            ShipmentNumber               = shipmentNumber,
+            SenderOrganizationId         = senderOrg.Id,
+            ReceiverOrganizationId       = receiverOrg.Id,
+            CreatedByUserId              = user.Id,
+            PickupAddressId              = pickupAddress.Id,
+            DropAddressId                = dropAddress.Id,
+            CargoType                    = request.CargoType,
+            CargoDescription             = request.CargoDescription,
+            CargoWeightKg                = request.CargoWeightKg,
+            CargoVolumeCubicMeters       = request.CargoVolumeCubicMeters,
+            PackageCount                 = request.PackageCount,
+            RequiresRefrigeration        = request.RequiresRefrigeration,
+            RequiresInsurance            = request.RequiresInsurance,
+            SpecialHandlingInstructions  = request.SpecialHandlingInstructions,
+            PreferredPickupDate          = request.PreferredPickupDate.HasValue
+                ? DateTime.SpecifyKind(request.PreferredPickupDate.Value, DateTimeKind.Utc) : null,
+            PreferredDeliveryDate        = request.PreferredDeliveryDate.HasValue
+                ? DateTime.SpecifyKind(request.PreferredDeliveryDate.Value, DateTimeKind.Utc) : null,
+            IsUrgent                     = request.IsUrgent,
+            AgreedPrice                  = request.AgreedPrice,
+            PricePerUnit                 = request.PricePerUnit,
+            LoadingCharges               = request.LoadingCharges,
+            UnloadingCharges             = request.UnloadingCharges,
+            OtherCharges                 = request.OtherCharges,
+            Status                       = "pending_approval",
+            CreatedAt                    = DateTime.UtcNow
         };
 
         return await _ship.CreateAsync(shipment);
@@ -94,12 +94,12 @@ PreferredDeliveryDate = request.PreferredDeliveryDate.HasValue
         if (org == null)
             throw new Exception("Organization not found");
 
-        var sent = await _ship.GetSentShipmentsAsync(org.Id);
+        var sent     = await _ship.GetSentShipmentsAsync(org.Id);
         var received = await _ship.GetReceivedShipmentsAsync(org.Id);
 
         return new
         {
-            sent = sent.Select(s => new { s.Id, s.ShipmentNumber, s.CargoType, s.Status, s.CreatedAt }),
+            sent     = sent.Select(s => new { s.Id, s.ShipmentNumber, s.CargoType, s.Status, s.CreatedAt }),
             received = received.Select(s => new { s.Id, s.ShipmentNumber, s.CargoType, s.Status, s.CreatedAt })
         };
     }
@@ -107,7 +107,7 @@ PreferredDeliveryDate = request.PreferredDeliveryDate.HasValue
     public async Task<List<object>> GetPendingShipmentsAsync()
     {
         var shipments = await _ship.GetByStatusAsync("pending_approval");
-        return shipments.Select(s => new
+        return shipments.Select(s => (object)new
         {
             s.Id,
             s.ShipmentNumber,
@@ -115,40 +115,113 @@ PreferredDeliveryDate = request.PreferredDeliveryDate.HasValue
             s.CargoWeightKg,
             s.Status,
             s.CreatedAt
-        }).Cast<object>().ToList();
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Returns shipments for any status. Used by admin to view all shipments.
+    /// Pass null to get everything.
+    /// </summary>
+    public async Task<List<object>> GetShipmentsByStatusAsync(string? status)
+    {
+        var shipments = status == null
+            ? await _ship.GetAllAsync()
+            : await _ship.GetByStatusAsync(status);
+
+        return shipments.Select(s => (object)new
+        {
+            s.Id,
+            s.ShipmentNumber,
+            s.CargoType,
+            s.CargoWeightKg,
+            s.Status,
+            s.UpdatedByAdmin,
+            s.CreatedAt,
+            s.UpdatedAt
+        }).ToList();
     }
 
     /// <summary>
     /// Approves a shipment and automatically enqueues it so drivers see it instantly.
     /// </summary>
-    public async Task<bool> ApproveShipmentAsync(Guid shipmentId)
+    public async Task<bool> ApproveShipmentAsync(Guid shipmentId, Guid? adminUserId = null)
     {
         var shipment = await _ship.GetByIdAsync(shipmentId);
-        if (shipment == null)
-            return false;
+        if (shipment == null) return false;
 
         if (shipment.Status != "pending_approval")
             throw new Exception("Shipment is not pending approval");
 
-        shipment.Status = "approved";
-        shipment.ApprovedAt = DateTime.UtcNow;
+        var previousStatus = shipment.Status;
+        shipment.Status      = "approved";
+        shipment.ApprovedAt  = DateTime.UtcNow;
+
+        if (adminUserId.HasValue)
+        {
+            shipment.UpdatedByAdmin  = true;
+            shipment.AdminOverrideBy = adminUserId;
+            shipment.AdminOverrideAt = DateTime.UtcNow;
+        }
+
         await _ship.UpdateAsync(shipment);
 
-        // ✅ KEY FIX: auto-enqueue so it appears on Union/Driver queue immediately
+        // Auto-enqueue so it appears on driver queue immediately
         await _queueService.EnqueueAsync(shipmentId, null, null);
+
+        await _log.LogAsync("shipment.approved", adminUserId, adminUserId.HasValue ? "admin" : "system",
+            "shipment", shipmentId, new { shipment.ShipmentNumber, from = previousStatus, to = "approved" });
 
         return true;
     }
 
-    public async Task<bool> RejectShipmentAsync(Guid shipmentId, string reason)
+    public async Task<bool> RejectShipmentAsync(Guid shipmentId, string reason, Guid? adminUserId = null)
     {
         var shipment = await _ship.GetByIdAsync(shipmentId);
-        if (shipment == null)
-            return false;
+        if (shipment == null) return false;
 
-        shipment.Status = "rejected";
+        var previousStatus       = shipment.Status;
+        shipment.Status          = "rejected";
         shipment.RejectionReason = reason;
+
+        if (adminUserId.HasValue)
+        {
+            shipment.UpdatedByAdmin  = true;
+            shipment.AdminOverrideBy = adminUserId;
+            shipment.AdminOverrideAt = DateTime.UtcNow;
+        }
+
         await _ship.UpdateAsync(shipment);
+
+        await _log.LogAsync("shipment.rejected", adminUserId, adminUserId.HasValue ? "admin" : "system",
+            "shipment", shipmentId, new { shipment.ShipmentNumber, from = previousStatus, reason });
+
+        return true;
+    }
+
+    /// <summary>
+    /// Admin-only: cancels a shipment regardless of its current status (except already delivered).
+    /// </summary>
+    public async Task<bool> CancelShipmentAsync(Guid shipmentId, Guid adminUserId, string reason)
+    {
+        var shipment = await _ship.GetByIdAsync(shipmentId);
+        if (shipment == null) return false;
+
+        if (shipment.Status == "delivered")
+            throw new Exception("Cannot cancel a delivered shipment");
+
+        var previousStatus           = shipment.Status;
+        shipment.Status              = "cancelled";
+        shipment.CancellationReason  = reason;
+        shipment.UpdatedByAdmin      = true;
+        shipment.AdminOverrideBy     = adminUserId;
+        shipment.AdminOverrideAt     = DateTime.UtcNow;
+
+        await _ship.UpdateAsync(shipment);
+
+        await _log.LogAsync("shipment.cancelled", adminUserId, "admin",
+            "shipment", shipmentId,
+            new { shipment.ShipmentNumber, from = previousStatus, to = "cancelled", reason });
+
         return true;
     }
 

@@ -37,9 +37,6 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-<<<<<<< HEAD
-        }
-=======
         },
         "SdkAnalysisLevel": "10.0.100"
       },

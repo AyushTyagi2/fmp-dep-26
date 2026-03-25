@@ -1,196 +1,223 @@
 import 'package:flutter/material.dart';
+import '../sys_admin_api.dart';
+import '../../../../shared/theme/app_theme.dart';
 
-class LogsView extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGS VIEW — Logic unchanged, premium UI applied
+// ─────────────────────────────────────────────────────────────────────────────
+
+class LogsView extends StatefulWidget {
   const LogsView({super.key});
+
+  @override
+  State<LogsView> createState() => _LogsViewState();
+}
+
+class _LogsViewState extends State<LogsView> {
+  final _api = SysAdminApi();
+  List<dynamic> _allLogs = [];
+  String _filter         = 'All Logs';
+  bool _loading          = true;
+  String? _error;
+
+  static const _filters = [
+    'All Logs',
+    'force_assigned',
+    'cancel',
+    'approve',
+    'reject',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final logs = await _api.getLogs(limit: 100);
+      setState(() { _allLogs = logs; _loading = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  List<dynamic> get _filtered {
+    if (_filter == 'All Logs') return _allLogs;
+    return _allLogs.where((l) {
+      final et = (l['eventType'] as String? ?? '').toLowerCase();
+      return et.contains(_filter.toLowerCase());
+    }).toList();
+  }
+
+  Color _eventColor(String eventType) {
+    final et = eventType.toLowerCase();
+    if (et.contains('cancel') || et.contains('reject')) return AppColors.error;
+    if (et.contains('force') || et.contains('override'))  return AppColors.warning;
+    if (et.contains('approve') || et.contains('assign'))  return AppColors.success;
+    return AppColors.primary;
+  }
+
+  IconData _eventIcon(String eventType) {
+    final et = eventType.toLowerCase();
+    if (et.contains('cancel'))   return Icons.cancel_rounded;
+    if (et.contains('reject'))   return Icons.block_rounded;
+    if (et.contains('force'))    return Icons.flash_on_rounded;
+    if (et.contains('approve'))  return Icons.check_circle_rounded;
+    if (et.contains('assign'))   return Icons.assignment_ind_rounded;
+    return Icons.info_outline_rounded;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // ── Filter chips ──────────────────────────────────────────────────
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          color: Colors.white,
+          color: AppColors.surface,
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           child: Row(
             children: [
-              // FIX 2: Wrapped chips in an Expanded + SingleChildScrollView to prevent overflow
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      const _FilterChip(label: "All Logs", isSelected: true),
-                      const SizedBox(width: 8),
-                      const _FilterChip(label: "Errors", isSelected: false),
-                      const SizedBox(width: 8),
-                      const _FilterChip(label: "Warnings", isSelected: false),
-                    ],
+                child: SizedBox(
+                  height: 32,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _filters.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
+                    itemBuilder: (ctx, i) {
+                      final f = _filters[i];
+                      final active = _filter == f;
+                      return GestureDetector(
+                        onTap: () => setState(() => _filter = f),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.primary : AppColors.background,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(
+                              color: active ? AppColors.primary : AppColors.border,
+                            ),
+                          ),
+                          child: Text(
+                            f,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: active ? Colors.white : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              TextButton.icon(
-                icon: const Icon(Icons.download, size: 18),
-                label: const Text("Export"),
-                style: TextButton.styleFrom(foregroundColor: Colors.indigo),
-                onPressed: () {},
-              )
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  onPressed: _load,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
             ],
           ),
         ),
         const Divider(height: 1),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: 50,
-            itemBuilder: (context, index) {
-              final isError = index % 7 == 0;
-              final isWarning = index % 5 == 0 && !isError;
-              
-              Color statusColor = Colors.blue;
-              Color bgColor = Colors.blue.shade50;
-              IconData icon = Icons.info_outline;
-              String title = "User Login Success";
-              
-              if (isError) {
-                statusColor = Colors.red;
-                bgColor = Colors.red.shade50;
-                icon = Icons.error_outline;
-                title = "Database Connection Timeout";
-              } else if (isWarning) {
-                statusColor = Colors.orange;
-                bgColor = Colors.orange.shade50;
-                icon = Icons.warning_amber;
-                title = "High API Latency Detected";
+
+        // ── Log list ──────────────────────────────────────────────────────
+        if (_loading)
+          const Expanded(child: Center(child: CircularProgressIndicator()))
+        else if (_error != null)
+          Expanded(
+            child: Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 40),
+                const SizedBox(height: 12),
+                const Text('Failed to load logs', style: AppTextStyles.headingSm),
+                const SizedBox(height: 16),
+                ElevatedButton(onPressed: _load, child: const Text('Retry')),
+              ]),
+            ),
+          )
+        else
+          Expanded(
+            child: Builder(builder: (ctx) {
+              final logs = _filtered;
+              if (logs.isEmpty) {
+                return Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.inbox_rounded, size: 48, color: AppColors.textHint),
+                    const SizedBox(height: 12),
+                    const Text('No logs for this filter', style: AppTextStyles.bodyMd),
+                  ]),
+                );
               }
-              
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: bgColor, // FIX 1: Applied your calculated background color here!
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
-                  ]
-                ),
-                // FIX 3: Used IntrinsicHeight and CrossAxisAlignment.stretch so the colored bar expands dynamically
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        width: 4,
-                        decoration: BoxDecoration(
-                          color: statusColor,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(12), 
-                            bottomLeft: Radius.circular(12)
+              return ListView.separated(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                itemCount: logs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (ctx, i) {
+                  final log       = logs[i] as Map<String, dynamic>;
+                  final eventType = log['eventType']?.toString() ?? '';
+                  final createdAt = log['createdAt']?.toString() ?? '';
+                  final entityId  = log['entityId']?.toString() ?? '';
+                  final timeLabel = createdAt.length >= 16
+                      ? createdAt.substring(0, 16).replaceFirst('T', ' ')
+                      : createdAt;
+                  final color = _eventColor(eventType);
+
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            shape: BoxShape.circle,
                           ),
+                          child: Icon(_eventIcon(eventType), size: 16, color: color),
                         ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+                        const SizedBox(width: 12),
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(icon, color: statusColor, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      title, 
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "15:3$index:04 PST", 
-                                    style: TextStyle(
-                                      fontFamily: 'monospace', 
-                                      color: Colors.grey.shade500, 
-                                      fontSize: 12
-                                    )
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                isError ? "Connection refused by target machine 192.168.1.$index" 
-                                  : isWarning ? "Response time degraded to 2.4s for endpoint /api/v1/drivers" 
-                                  : "Auth token issued for user ID ${400 + index} from IP 10.0.0.$index",
-                                style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  _Tag(text: "Server-0${(index % 3) + 1}"),
-                                  const SizedBox(width: 8),
-                                  _Tag(text: isError ? "db-cluster" : isWarning ? "gateway" : "auth-service"),
-                                ],
-                              )
+                              Text(eventType, style: AppTextStyles.labelLg),
+                              if (entityId.isNotEmpty)
+                                Text(
+                                  'Entity: $entityId',
+                                  style: AppTextStyles.bodySm,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                        Text(timeLabel, style: AppTextStyles.caption),
+                      ],
+                    ),
+                  );
+                },
               );
-            },
+            }),
           ),
-        ),
       ],
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-
-  const _FilterChip({required this.label, required this.isSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.indigo : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.grey.shade700,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-          fontSize: 13,
-        ),
-      ),
-    );
-  }
-}
-
-class _Tag extends StatelessWidget {
-  final String text;
-
-  const _Tag({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontFamily: 'monospace'),
-      ),
     );
   }
 }

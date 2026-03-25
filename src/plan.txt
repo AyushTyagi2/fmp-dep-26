@@ -149,3 +149,12 @@ Skip penalty (end of queue / temporary block)
 Timeout duration (e.g. 10 minutes)
 Emergency override
 📌 These rules are data-driven, not code-driven.
+
+
+
+C:\Dev\startup\fmp>psql 'postgresql://neondb_owner:npg_rcQOAv59HpGb@ep-winter-credit-ai1hj0m6-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require' 
+psql: error: invalid connection option "'postgresql://neondb_owner:npg_rcQOAv59HpGb@ep-winter-credit-ai1hj0m6-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode"
+'channel_binding' is not recognized as an internal or external command,
+operable program or batch file.
+
+C:\Dev\startup\fmp>

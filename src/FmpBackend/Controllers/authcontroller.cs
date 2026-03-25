@@ -35,6 +35,7 @@ public class AuthController : ControllerBase
         _otpService.GenerateOtp(dto.Phone);
         return Ok(new { success = true });
     }
+    
 
     [HttpPost("verify-otp")]
     public IActionResult VerifyOtp([FromBody] VerifyOtpDto dto)

@@ -94,6 +94,31 @@ public class QueueMaintenanceWorker : BackgroundService
             }
         }
 
+        // ── 2. Unconditional matching pass ───────────────────────────────────
+var liveEvents = await db.QueueEvents
+    .Where(e => e.Status == QueueEventStatus.Live && e.EndTime > now)
+    .ToListAsync();
+
+foreach (var liveEvent in liveEvents)
+{
+    var hasIdleDrivers = await db.DriverQueueEntries
+        .AnyAsync(e => e.QueueEventId == liveEvent.Id
+                    && !e.HasClaimed
+                    && (e.OfferStatus == DriverOfferStatus.Idle
+                     || e.OfferStatus == DriverOfferStatus.Passed
+                     || e.OfferStatus == DriverOfferStatus.Expired));
+
+    var hasWaitingShipments = await db.ShipmentQueues
+        .AnyAsync(s => s.Status == ShipmentQueueStatus.Waiting
+                    && (s.ZoneId == null || s.ZoneId == liveEvent.ZoneId));
+
+    if (hasIdleDrivers && hasWaitingShipments)
+    {
+        var svc = scope.ServiceProvider.GetRequiredService<QueueEventService>();
+        await svc.AssignOffersAsync(liveEvent);
+    }
+}
+
         // ── 2. Close expired QueueEvents ─────────────────────────────────────
         var closedEvents = await db.QueueEvents
             .Where(e => e.Status == QueueEventStatus.Live && e.EndTime <= now)
