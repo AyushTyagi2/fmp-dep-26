@@ -53,6 +53,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
       const SizedBox.shrink(),
       // index 2 — Profile
       const DriverProfileScreen(),
+      
     ];
 
     return Scaffold(
@@ -70,12 +71,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
       bottomNavigationBar: _DriverBottomNav(
         current: _tab,
         onTap: (i) {
-          if (i == 1) {
-            Navigator.pushNamed(context, '/driver-queue');
-          } else {
-            setState(() => _tab = i);
-          }
-        },
+  if (i == 1) {
+    Navigator.pushNamed(context, '/driver-queue');
+  } else if (i == 3) {
+    Navigator.pushNamed(context, '/billing'); // or ignore
+  } else {
+    setState(() => _tab = i);
+  }
+},
       ),
       floatingActionButton: _tab == 0
           ? FloatingActionButton.extended(
@@ -483,6 +486,7 @@ class _DriverBottomNav extends StatelessWidget {
           BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.queue_rounded), label: 'Queue'),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Billing'),
         ],
       ),
     );
