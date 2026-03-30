@@ -2,5 +2,5 @@ namespace FmpBackend.Dtos;
 
 public class RequestOtpDto
 {
-    public string Phone { get; set; }
+    public string Email { get; set; } = null!;
 }

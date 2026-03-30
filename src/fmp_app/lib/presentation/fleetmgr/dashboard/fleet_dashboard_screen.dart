@@ -43,7 +43,7 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
   }
 
   Future<void> _loadDashboard() async {
-    final phone = AppSession.phone;
+    final phone = AppSession.email;  
     if (phone == null) return;
     setState(() => _loading = true);
     try {

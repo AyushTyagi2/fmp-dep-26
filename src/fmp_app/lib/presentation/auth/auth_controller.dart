@@ -5,7 +5,7 @@ import 'package:fmp_app/app_session.dart';
 
 enum AuthStage {
   idle,
-  phoneEntered,
+  emailEntered,
   otpSending,
   otpSent,
   verifyingOtp,
@@ -20,7 +20,7 @@ class AuthController extends ChangeNotifier {
 
   AuthStage _stage = AuthStage.idle;
 
-  String? phone;
+  String? email;
   String? errorMessage;
 
   int _secondsLeft = 0;
@@ -29,19 +29,18 @@ class AuthController extends ChangeNotifier {
   AuthStage get stage => _stage;
   int get secondsLeft => _secondsLeft;
 
-  void setPhone(String value) {
-    phone = value;
-    _stage = AuthStage.phoneEntered;
+  void setEmail(String value) {
+    email = value;
+    _stage = AuthStage.emailEntered;
     notifyListeners();
   }
 
   Future<void> chooseRole(BuildContext context, String role) async {
     try {
-      final res = await _authApi.resolveRole(phone!, role);
+      final res = await _authApi.resolveRole(email!, role);
 
-      // Save session including the chosen role
       await AppSession.save(
-        phone:    phone!,
+        email:    email!,
         token:    res['token'] as String,
         driverId: res['driverId'] as String?,
         role:     role,
@@ -91,37 +90,35 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-    Future<bool> tryAutoRoute(BuildContext context) async {
-  try {
-    for (final role in ['SUPER_ADMIN', 'UNION_MANAGER']) {
-      final res = await _authApi.resolveRole(phone!, role);
-      final screen = res['screen'] as String?;
-      debugPrint('tryAutoRoute: role=$role, screen=$screen');
+  Future<bool> tryAutoRoute(BuildContext context) async {
+    try {
+      for (final role in ['SUPER_ADMIN', 'UNION_MANAGER']) {
+        final res = await _authApi.resolveRole(email!, role);
+        final screen = res['screen'] as String?;
+        debugPrint('tryAutoRoute: role=$role, screen=$screen');
 
-      if (screen == 'admin_dashboard' || screen == 'union_dashboard') {
-        await AppSession.save(
-          phone: phone!,
-          token: res['token'] as String,
-          driverId: null,
-          role: role,
-        );
-        if (!context.mounted) return false;
-        Navigator.pushReplacementNamed(
-          context,
-          screen == 'admin_dashboard' ? '/system_admin' : '/union-dashboard',
-        );
-        return true;
+        if (screen == 'admin_dashboard' || screen == 'union_dashboard') {
+          await AppSession.save(
+            email: email!,
+            token: res['token'] as String,
+            driverId: null,
+            role: role,
+          );
+          if (!context.mounted) return false;
+          Navigator.pushReplacementNamed(
+            context,
+            screen == 'admin_dashboard' ? '/system_admin' : '/union-dashboard',
+          );
+          return true;
+        }
       }
-      // 'unauthorized' or anything else → continue loop
-    }
-  } catch (_) {}
-  return false;
-}
-
+    } catch (_) {}
+    return false;
+  }
 
   Future<void> sendOtp() async {
-    if (phone == null || phone!.isEmpty) {
-      _setError('Phone number missing');
+    if (email == null || email!.isEmpty) {
+      _setError('Email address missing');
       return;
     }
 
@@ -129,7 +126,7 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _authApi.requestOtp(phone!);
+      await _authApi.requestOtp(email!);
       _startTimer();
       _stage = AuthStage.otpSent;
       notifyListeners();
@@ -149,10 +146,10 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _authApi.verifyOtp(phone!, otp);
+      await _authApi.verifyOtp(email!, otp);
       _stopTimer();
       _stage = AuthStage.authenticated;
-      AppSession.phone = phone;
+      AppSession.email = email;
       notifyListeners();
     } catch (e) {
       _setError('Incorrect or expired OTP!');
@@ -185,7 +182,7 @@ class AuthController extends ChangeNotifier {
   }
 
   void reset() {
-    phone = null;
+    email = null;
     errorMessage = null;
     _stopTimer();
     _stage = AuthStage.idle;

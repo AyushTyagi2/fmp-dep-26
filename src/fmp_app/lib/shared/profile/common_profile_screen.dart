@@ -22,7 +22,7 @@ class CommonProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone    = AppSession.phone    ?? '—';
+    final phone    = AppSession.email    ?? '—';
     final role     = AppSession.roleLabel;
     final driverId = AppSession.driverId;
 

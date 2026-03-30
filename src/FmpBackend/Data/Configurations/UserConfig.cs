@@ -14,6 +14,7 @@ public class UserConfig : IEntityTypeConfiguration<User>
 
         entity.Property(e => e.Id).HasColumnName("id");
         entity.Property(e => e.Phone).HasColumnName("phone");
+        entity.Property(e => e.Email).HasColumnName("email");
         entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
         entity.Property(e => e.FullName).HasColumnName("full_name");
         entity.Property(e => e.AuthProvider).HasColumnName("auth_provider");

@@ -38,7 +38,7 @@ class _DriverBasicScreenState extends State<DriverBasicScreen> {
 
     try {
       await _authApi.submitDriverDetails(
-        phone: AppSession.phone ?? '',
+        email: AppSession.email ?? '',
         vehicleNumber: _vehicleNum.text.trim(),
         vehicleType: _vehicleType,
       );

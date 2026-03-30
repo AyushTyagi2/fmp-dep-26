@@ -9,9 +9,9 @@ namespace FmpBackend.Controllers;
 [Route("auth")]
 public class AuthController : ControllerBase
 {
-    private readonly OtpService    _otpService;
-    private readonly RoleService   _roleService;
-    private readonly JwtService    _jwtService;
+    private readonly OtpService      _otpService;
+    private readonly RoleService     _roleService;
+    private readonly JwtService      _jwtService;
     private readonly DriverRepository _drivers;
     private readonly UserRepository   _users;
 
@@ -32,17 +32,16 @@ public class AuthController : ControllerBase
     [HttpPost("request-otp")]
     public IActionResult RequestOtp([FromBody] RequestOtpDto dto)
     {
-        _otpService.GenerateOtp(dto.Phone);
+        _otpService.GenerateOtp(dto.Email);
         return Ok(new { success = true });
     }
-    
 
     [HttpPost("verify-otp")]
     public IActionResult VerifyOtp([FromBody] VerifyOtpDto dto)
     {
         try
         {
-            _otpService.VerifyOtp(dto.Phone, dto.Otp);
+            _otpService.VerifyOtp(dto.Email, dto.Otp);
             return Ok(new { success = true });
         }
         catch (Exception ex)
@@ -54,12 +53,12 @@ public class AuthController : ControllerBase
     [HttpPost("resolve-role")]
     public IActionResult ResolveRole([FromBody] ResolveRoleDto dto)
     {
-        var screen = _roleService.Resolve(dto.Phone, dto.Role);
-        var token  = _jwtService.Generate(dto.Phone, dto.Role);
+        var screen = _roleService.Resolve(dto.Email, dto.Role);
+        var token  = _jwtService.Generate(dto.Email, dto.Role);
 
         // Look up driverId if this is a driver
         string? driverId = null;
-        var user = _users.GetByPhone(dto.Phone);
+        var user = _users.GetByEmail(dto.Email);
         if (user != null)
         {
             var driver = _drivers.GetByUserId(user.Id);
