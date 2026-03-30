@@ -53,7 +53,7 @@ public class RoleService
         return driver != null ? "driver_dashboard" : "driver_onboarding";
     }
 
-    if (role == "organization")
+    if (role == "organization" || role == "sender"||role == "receiver")
     {
         var org = _orgs.GetByPhone(phone);
         return org != null ? "sender_dashboard" : "sender_onboarding";
