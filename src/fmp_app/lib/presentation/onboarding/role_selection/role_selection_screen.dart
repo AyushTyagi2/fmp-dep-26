@@ -56,7 +56,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
       bg: Color(0xFFEBF0FE),
     ),
     _RoleOption(
-      id: 'sender',
+      id: 'organization',
       label: 'Sender / Receiver',
       subtitle: 'Create & track your shipments',
       icon: Icons.inventory_2_rounded,

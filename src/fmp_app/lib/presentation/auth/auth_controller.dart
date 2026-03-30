@@ -76,6 +76,9 @@ class AuthController extends ChangeNotifier {
         case 'union_dashboard':
           Navigator.pushReplacementNamed(context, '/union-dashboard');
           break;
+        case 'unauthorized':
+          _setError('You do not have permission to access this role');
+          break;
         default:
           final msg = 'Unexpected navigation target: $screen';
           try {
