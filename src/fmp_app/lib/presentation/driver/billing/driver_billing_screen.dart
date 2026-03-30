@@ -6,14 +6,14 @@ import 'package:fmp_app/presentation/driver/profile/driver_profile_screen.dart';
 
 // lib/presentation/driver/dashboard/driver_dashboard_screen.dart
 
-class DriverDashboardScreen extends StatefulWidget {
-  const DriverDashboardScreen({super.key});
+class DriverBillingScreen extends StatefulWidget {
+  const DriverBillingScreen({super.key});
 
   @override
-  State<DriverDashboardScreen> createState() => _DriverDashboardScreenState();
+  State<DriverBillingScreen> createState() => _DriverBillingScreenState();
 }
 
-class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
+class _DriverBillingScreenState extends State<DriverBillingScreen> {
   int _tab = 0;
   final _apiClient = ApiClient();
   late final TripApiService _tripApi;

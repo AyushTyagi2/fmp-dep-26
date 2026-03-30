@@ -17,7 +17,7 @@ import 'package:fmp_app/presentation/sys_admin_dashboard/sys_admin_dashboard_scr
 import 'package:fmp_app/presentation/driver/queue/driver_queue_screen.dart';
 import 'package:fmp_app/presentation/sender/create/sender_create_shipment_screen.dart';
 import 'package:fmp_app/presentation/driver/trips/driver_trip_detail_screen.dart';
-import 'package:fmp_app/presentation/driver/billing/driver_billing_screen.dart';
+import 'package:fmp_app/presentation/driver/billing/driver_billing_screen.dart' ;
 
 import '../app_session.dart';
 
@@ -64,6 +64,6 @@ class AppRouter {
     createShipment: (_) => const SenderCreateShipmentScreen(),
     //driverOnboarding: (_) => const DriverOnboardingScreen(),
     senderdashboard: (_) => const SenderDashboardScreen(),
-    billing:         (_) => const BillingPage(),
+    billing:         (_) => const DriverBillingScreen(),
   };
 }
