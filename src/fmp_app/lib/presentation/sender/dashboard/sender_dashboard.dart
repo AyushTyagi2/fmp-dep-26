@@ -3,6 +3,7 @@ import '../home/sender_home_screen.dart';
 import '../create/sender_create_shipment_screen.dart';
 import '../shipments/sender_shipments_screen.dart';
 import '../billing/sender_billing_screen.dart';
+import '../analytics/sender_analytics_screen.dart'; // NEW
 import '../profile/sender_profile_screen.dart';
 import '../../../shared/theme/app_theme.dart';
 
@@ -25,6 +26,7 @@ class _SenderDashboardScreenState extends State<SenderDashboardScreen> {
     SenderCreateShipmentScreen(),
     SenderShipmentsScreen(),
     SenderBillingScreen(),
+    SenderAnalyticsScreen(), // NEW
     SenderProfileScreen(),
   ];
 
@@ -33,6 +35,7 @@ class _SenderDashboardScreenState extends State<SenderDashboardScreen> {
     _NavItem(Icons.add_box_rounded,       Icons.add_box_outlined,      'Create'),
     _NavItem(Icons.local_shipping_rounded,Icons.local_shipping_outlined,'Shipments'),
     _NavItem(Icons.receipt_long_rounded,  Icons.receipt_long_outlined, 'Billing'),
+    _NavItem(Icons.bar_chart_rounded,     Icons.bar_chart_outlined,    'Analytics'),
     _NavItem(Icons.business_rounded,      Icons.business_outlined,     'Profile'),
   ];
 

@@ -75,6 +75,7 @@ builder.Services.AddScoped<QueueEventService>();
 builder.Services.AddScoped<SystemLogRepository>(); // ← NEW
 builder.Services.AddScoped<SystemLogService>();    // ← NEW
 builder.Services.AddScoped<SysAdminService>();
+builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddHostedService<QueueMaintenanceWorker>();
 
