@@ -64,6 +64,6 @@ class AppRouter {
     createShipment: (_) => const SenderCreateShipmentScreen(),
     //driverOnboarding: (_) => const DriverOnboardingScreen(),
     senderdashboard: (_) => const SenderDashboardScreen(),
-    billing:         (_) => const BillingPage(),
+    billing:         (_) => const DriverBillingScreen(),
   };
 }
