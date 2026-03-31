@@ -3,7 +3,6 @@ import '../union_queue/queue.dart';
 import '../union_request/request.dart';
 import '../union_profile/profile.dart';
 import '../union_home/home.dart';
-import '../analytics/union_analytics_screen.dart'; // NEW
 import '../../../shared/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,7 +25,6 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
     const UnionHomeScreen(),
     QueueScreen(driverId: widget.driverId),
     const UnionRequestScreen(),
-    const UnionAnalyticsScreen(), // NEW
     const UnionProfileScreen(),
   ];
 
@@ -34,7 +32,6 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
     (Icons.home_rounded,    Icons.home_outlined,            'Home'),
     (Icons.inbox_rounded,   Icons.inbox_outlined,           'Queue'),
     (Icons.folder_rounded,  Icons.folder_outlined,          'Requests'),
-    (Icons.bar_chart_rounded, Icons.bar_chart_outlined,     'Analytics'),
     (Icons.person_rounded,  Icons.person_outline_rounded,   'Profile'),
   ];
 
