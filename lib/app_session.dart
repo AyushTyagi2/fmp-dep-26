@@ -3,30 +3,30 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class AppSession {
   static const _storage = FlutterSecureStorage();
 
-  static String? phone;
+  static String? email;
   static String? driverId;
   static String? token;
-  static String? role; // NEW — persisted alongside token
+  static String? role;
 
   static Future<void> restore() async {
-    phone    = await _storage.read(key: 'phone');
+    email    = await _storage.read(key: 'email');
     driverId = await _storage.read(key: 'driver_id');
     token    = await _storage.read(key: 'token');
     role     = await _storage.read(key: 'role');
   }
 
   static Future<void> save({
-    required String phone,
+    required String email,
     required String token,
     String? driverId,
     String? role,
   }) async {
-    AppSession.phone    = phone;
+    AppSession.email    = email;
     AppSession.token    = token;
     AppSession.driverId = driverId;
     AppSession.role     = role;
 
-    await _storage.write(key: 'phone', value: phone);
+    await _storage.write(key: 'email', value: email);
     await _storage.write(key: 'token', value: token);
     if (driverId != null) {
       await _storage.write(key: 'driver_id', value: driverId);
@@ -37,7 +37,7 @@ class AppSession {
   }
 
   static Future<void> clear() async {
-    phone    = null;
+    email    = null;
     driverId = null;
     token    = null;
     role     = null;
@@ -46,7 +46,6 @@ class AppSession {
 
   static bool get isLoggedIn => token != null;
 
-  /// Human-readable role label for display in the profile page.
   static String get roleLabel {
     switch (role) {
       case 'driver':      return 'Driver';

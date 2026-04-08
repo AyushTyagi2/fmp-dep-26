@@ -38,7 +38,7 @@ class _SenderShipmentsScreenState extends State<SenderShipmentsScreen>
     if (sentShipments.isEmpty && receivedShipments.isEmpty) {
       setState(() => isLoading = true);
     }
-    final phone = AppSession.phone;
+    final phone = AppSession.email;  
     if (phone == null) {
       if (mounted) setState(() => isLoading = false);
       return;

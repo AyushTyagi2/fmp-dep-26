@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../routes/app_router.dart';
+import '../auth_controller.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -73,6 +75,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final auth = context.read<AuthController>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FF),
@@ -226,9 +229,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 44),
+                  const SizedBox(height: 36),
 
-                  // ── CTA Button ────────────────────────────────────────────
+                  // ── Email OTP button ──────────────────────────────────────
                   AnimatedBuilder(
                     animation: _slideUp,
                     builder: (context, child) => Transform.translate(
@@ -237,9 +240,54 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           opacity: _slideUp.value.clamp(0.0, 1.0),
                           child: child),
                     ),
-                    child: _PhoneButton(
+                    child: _EmailButton(
                       onTap: () =>
-                          Navigator.pushNamed(context, AppRouter.phone),
+                          Navigator.pushNamed(context, AppRouter.email),
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // ── Divider ───────────────────────────────────────────────
+                  FadeTransition(
+                    opacity: _fadeIn,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            color: const Color(0xFF4A5568).withOpacity(0.18),
+                            thickness: 1,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or',
+                            style: TextStyle(
+                              color: const Color(0xFF4A5568).withOpacity(0.45),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: const Color(0xFF4A5568).withOpacity(0.18),
+                            thickness: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // ── Google Sign-In button ─────────────────────────────────
+                  FadeTransition(
+                    opacity: _fadeIn,
+                    child: _GoogleButton(
+                      onTap: () async {
+                        await auth.signInWithGoogle(context);
+                      },
                     ),
                   ),
 
@@ -272,17 +320,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 }
 
-// ── Phone CTA Button ──────────────────────────────────────────────────────────
+// ── Email OTP Button ──────────────────────────────────────────────────────────
 
-class _PhoneButton extends StatefulWidget {
+class _EmailButton extends StatefulWidget {
   final VoidCallback onTap;
-  const _PhoneButton({required this.onTap});
+  const _EmailButton({required this.onTap});
 
   @override
-  State<_PhoneButton> createState() => _PhoneButtonState();
+  State<_EmailButton> createState() => _EmailButtonState();
 }
 
-class _PhoneButtonState extends State<_PhoneButton>
+class _EmailButtonState extends State<_EmailButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _pressCtrl;
   late Animation<double> _scale;
@@ -332,18 +380,18 @@ class _PhoneButtonState extends State<_PhoneButton>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Container(
-              //   padding: const EdgeInsets.all(6),
-              //   decoration: BoxDecoration(
-              //     color: Colors.white.withOpacity(0.18),
-              //     borderRadius: BorderRadius.circular(8),
-              //   ),
-              //   child: const Icon(Icons.phone_android_rounded,
-              //       color: Colors.white, size: 17),
-              // ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.mail_outline_rounded,
+                    color: Colors.white, size: 17),
+              ),
               const SizedBox(width: 12),
               const Text(
-                'Continue with Phone',
+                'Continue with Email',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -360,6 +408,161 @@ class _PhoneButtonState extends State<_PhoneButton>
       ),
     );
   }
+}
+
+// ── Google Sign-In Button ─────────────────────────────────────────────────────
+
+class _GoogleButton extends StatefulWidget {
+  final VoidCallback onTap;
+  const _GoogleButton({required this.onTap});
+
+  @override
+  State<_GoogleButton> createState() => _GoogleButtonState();
+}
+
+class _GoogleButtonState extends State<_GoogleButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressCtrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
+    _scale = Tween<double>(begin: 1.0, end: 0.96)
+        .animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _pressCtrl.forward(),
+      onTapUp: (_) {
+        _pressCtrl.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _pressCtrl.reverse(),
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (_, child) =>
+            Transform.scale(scale: _scale.value, child: child),
+        child: Container(
+          width: double.infinity,
+          height: 58,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+            border: Border.all(
+              color: const Color(0xFFE2E8F0),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Google "G" logo drawn with coloured text
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const _GoogleLogo(),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Continue with Google',
+                style: TextStyle(
+                  color: Color(0xFF1A202C),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleLogo extends StatelessWidget {
+  const _GoogleLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    // Simple multicolour "G" using a CustomPainter
+    return CustomPaint(painter: _GoogleGPainter(), size: const Size(28, 28));
+  }
+}
+
+class _GoogleGPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final r = size.width * 0.42;
+
+    final colors = [
+      const Color(0xFF4285F4), // blue
+      const Color(0xFF34A853), // green
+      const Color(0xFFFBBC05), // yellow
+      const Color(0xFFEA4335), // red
+    ];
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.15
+      ..strokeCap = StrokeCap.round;
+
+    // Draw 4 arcs (blue top-right, green bottom-right, yellow bottom-left, red top-left)
+    final sweeps = [
+      [0.0, 90.0],
+      [90.0, 90.0],
+      [180.0, 90.0],
+      [270.0, 90.0],
+    ];
+
+    for (var i = 0; i < 4; i++) {
+      paint.color = colors[i];
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset(cx, cy), radius: r),
+        sweeps[i][0] * 3.14159 / 180,
+        sweeps[i][1] * 3.14159 / 180,
+        false,
+        paint,
+      );
+    }
+
+    // Horizontal bar for the "G" cutout
+    final barPaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..strokeWidth = size.width * 0.15
+      ..strokeCap = StrokeCap.square;
+    canvas.drawLine(
+      Offset(cx, cy),
+      Offset(cx + r, cy),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ── Truck Illustration ────────────────────────────────────────────────────────
@@ -381,7 +584,6 @@ class _TruckPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    // Shadow under truck
     final shadowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -396,14 +598,12 @@ class _TruckPainter extends CustomPainter {
       shadowPaint,
     );
 
-    // Road
     final roadPaint = Paint()
       ..color = const Color(0xFFD1DCF0)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
     canvas.drawLine(Offset(0, h * 0.80), Offset(w, h * 0.80), roadPaint);
 
-    // Dashed line
     final dashPaint = Paint()
       ..color = const Color(0xFFB8C9E8)
       ..strokeWidth = 1.5
@@ -413,7 +613,6 @@ class _TruckPainter extends CustomPainter {
           Offset(x, h * 0.80), Offset(x + 10, h * 0.80), dashPaint);
     }
 
-    // Cargo box
     final cargoFill = Paint()
       ..color = const Color(0xFFE8EFFF)
       ..style = PaintingStyle.fill;
@@ -428,7 +627,6 @@ class _TruckPainter extends CustomPainter {
     canvas.drawRRect(cargoRect, cargoFill);
     canvas.drawRRect(cargoRect, cargoBorder);
 
-    // Cargo roof accent
     canvas.drawRRect(
       RRect.fromRectAndRadius(
           Rect.fromLTWH(w * 0.04, h * 0.30, w * 0.62, h * 0.055),
@@ -438,7 +636,6 @@ class _TruckPainter extends CustomPainter {
         ..style = PaintingStyle.fill,
     );
 
-    // Door lines
     final doorPaint = Paint()
       ..color = const Color(0xFFB0C4E8)
       ..strokeWidth = 1.0;
@@ -447,18 +644,6 @@ class _TruckPainter extends CustomPainter {
     canvas.drawLine(Offset(w * 0.20, h * 0.53), Offset(w * 0.66, h * 0.53),
         doorPaint);
 
-    // FMP logo on cargo
-    final logoPaint = Paint()
-      ..color = const Color(0xFF1A6DFF).withOpacity(0.15)
-      ..style = PaintingStyle.fill;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.10, h * 0.56, w * 0.18, h * 0.12),
-          const Radius.circular(4)),
-      logoPaint,
-    );
-
-    // Cab
     final cabFill = Paint()
       ..color = const Color(0xFFD8E6FF)
       ..style = PaintingStyle.fill;
@@ -479,7 +664,6 @@ class _TruckPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.5);
 
-    // Cab window
     final windowPath = Path()
       ..moveTo(w * 0.70, h * 0.44)
       ..lineTo(w * 0.70, h * 0.37)
@@ -500,12 +684,10 @@ class _TruckPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2);
 
-    // Wheels
     _drawWheel(canvas, Offset(w * 0.20, h * 0.785), 14);
     _drawWheel(canvas, Offset(w * 0.52, h * 0.785), 14);
     _drawWheel(canvas, Offset(w * 0.845, h * 0.785), 12);
 
-    // Headlight
     canvas.drawRRect(
       RRect.fromRectAndRadius(
           Rect.fromLTWH(w * 0.945, h * 0.56, w * 0.035, h * 0.07),
@@ -514,77 +696,23 @@ class _TruckPainter extends CustomPainter {
         ..color = const Color(0xFFFFB800)
         ..style = PaintingStyle.fill,
     );
-
-    // Headlight beam
-    final beamPath = Path()
-      ..moveTo(w * 0.97, h * 0.56)
-      ..lineTo(w * 1.07, h * 0.51)
-      ..lineTo(w * 1.07, h * 0.67)
-      ..lineTo(w * 0.97, h * 0.63)
-      ..close();
-    canvas.drawPath(
-        beamPath,
-        Paint()
-          ..shader = LinearGradient(
-            colors: [
-              const Color(0xFFFFB800).withOpacity(0.20),
-              Colors.transparent,
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ).createShader(
-              Rect.fromLTWH(w * 0.97, h * 0.51, w * 0.10, h * 0.16)));
-
-    // Speed lines
-    final speeds = [
-      [0.0, h * 0.54, w * 0.025, h * 0.54, 0.35],
-      [0.0, h * 0.61, w * 0.05, h * 0.61, 0.20],
-      [0.0, h * 0.47, w * 0.035, h * 0.47, 0.28],
-    ];
-    final speedPaint = Paint()
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    for (final l in speeds) {
-      speedPaint.color =
-          const Color(0xFF1A6DFF).withOpacity(l[4] as double);
-      canvas.drawLine(Offset(l[0] as double, l[1] as double),
-          Offset(l[2] as double, l[3] as double), speedPaint);
-    }
   }
 
   void _drawWheel(Canvas canvas, Offset center, double radius) {
-    // Tire
-    canvas.drawCircle(
-        center,
-        radius,
+    canvas.drawCircle(center, radius,
         Paint()
           ..color = const Color(0xFF3D4F6B)
           ..style = PaintingStyle.fill);
-    canvas.drawCircle(
-        center,
-        radius,
+    canvas.drawCircle(center, radius,
         Paint()
           ..color = const Color(0xFF8DA8CC)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2);
-    // Hub
-    canvas.drawCircle(
-        center,
-        radius * 0.44,
+    canvas.drawCircle(center, radius * 0.44,
         Paint()
           ..color = const Color(0xFFD8E6FF)
           ..style = PaintingStyle.fill);
-    canvas.drawCircle(
-        center,
-        radius * 0.44,
-        Paint()
-          ..color = const Color(0xFF1A6DFF).withOpacity(0.45)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0);
-    // Center
-    canvas.drawCircle(
-        center,
-        radius * 0.12,
+    canvas.drawCircle(center, radius * 0.12,
         Paint()
           ..color = const Color(0xFF1A6DFF)
           ..style = PaintingStyle.fill);
@@ -593,8 +721,6 @@ class _TruckPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-// ── Light Blob ────────────────────────────────────────────────────────────────
 
 class _LightBlob extends StatelessWidget {
   final Color color;
@@ -616,8 +742,6 @@ class _LightBlob extends StatelessWidget {
   }
 }
 
-// ── Diagonal Strip Painter ────────────────────────────────────────────────────
-
 class _DiagonalStripPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -638,8 +762,6 @@ class _DiagonalStripPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-// ── Dot Grid Painter ──────────────────────────────────────────────────────────
 
 class _DotGridPainter extends CustomPainter {
   @override

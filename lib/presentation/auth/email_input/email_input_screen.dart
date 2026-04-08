@@ -2,21 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fmp_app/presentation/auth/auth_controller.dart';
 
-// ── SAME LOGIC, REDESIGNED UI ─────────────────────────────────────────────────
-// lib/presentation/auth/phone_input/phone_input_screen.dart
-// All controller calls and routing unchanged.
+// lib/presentation/auth/email_input/email_input_screen.dart
 
-class PhoneInputScreen extends StatefulWidget {
-  const PhoneInputScreen({super.key});
+class EmailInputScreen extends StatefulWidget {
+  const EmailInputScreen({super.key});
 
   @override
-  State<PhoneInputScreen> createState() => _PhoneInputScreenState();
+  State<EmailInputScreen> createState() => _EmailInputScreenState();
 }
 
-class _PhoneInputScreenState extends State<PhoneInputScreen>
+class _EmailInputScreenState extends State<EmailInputScreen>
     with SingleTickerProviderStateMixin {
   final _formKey   = GlobalKey<FormState>();
-  final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -38,23 +36,21 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     _animCtrl.dispose();
     super.dispose();
   }
 
-  // ── UNCHANGED LOGIC ──────────────────────────────────────────────────────────
   Future<void> _sendOtp(BuildContext context) async {
     final auth = context.read<AuthController>();
     if (!_formKey.currentState!.validate()) return;
-    auth.setPhone(_phoneCtrl.text.trim());
+    auth.setEmail(_emailCtrl.text.trim());
     await auth.sendOtp();
     if (!mounted) return;
     if (auth.stage == AuthStage.otpSent) {
       Navigator.pushNamed(context, '/otp');
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +85,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Enter your mobile number to continue',
+                    'Enter your email address to continue',
                     style: TextStyle(
                       fontSize: 15, color: Color(0xFF6B7280), height: 1.5,
                     ),
@@ -103,7 +99,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Mobile Number',
+                          'Email Address',
                           style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w500,
                             color: Color(0xFF374151),
@@ -111,37 +107,28 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                         ),
                         const SizedBox(height: 6),
                         TextFormField(
-                          controller: _phoneCtrl,
-                          keyboardType: TextInputType.phone,
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.done,
+                          autocorrect: false,
                           onFieldSubmitted: (_) => _sendOtp(context),
                           style: const TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w500,
                             color: Color(0xFF111827),
                           ),
                           decoration: InputDecoration(
-                            hintText: '98765 43210',
+                            hintText: 'you@example.com',
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 0, vertical: 15,
+                              horizontal: 16, vertical: 15,
                             ),
-                            prefixIcon: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 14,
-                              ),
-                              margin: const EdgeInsets.only(right: 0),
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  right: BorderSide(color: Color(0xFFE5E9F0), width: 1.5),
-                                ),
-                              ),
-                              child: const Text(
-                                '🇮🇳  +91',
-                                style: TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w500,
-                                  color: Color(0xFF374151),
-                                ),
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 14),
+                              child: Icon(
+                                Icons.mail_outline_rounded,
+                                color: Color(0xFF6B7280),
+                                size: 20,
                               ),
                             ),
                             border: OutlineInputBorder(
@@ -167,7 +154,9 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                           ),
                           validator: (v) {
                             final s = v?.trim() ?? '';
-                            if (s.length < 10) return 'Enter a valid 10-digit number';
+                            final emailRegex = RegExp(r'^[\w\.\+\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+                            if (s.isEmpty) return 'Please enter your email address';
+                            if (!emailRegex.hasMatch(s)) return 'Enter a valid email address';
                             return null;
                           },
                         ),
@@ -190,8 +179,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                             ),
                             child: isLoading
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
+                                    width: 20, height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.5,
                                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -253,8 +241,7 @@ class _BrandMark extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 48, height: 48,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
@@ -270,29 +257,14 @@ class _BrandMark extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(
-            Icons.local_shipping_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
+          child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 24),
         ),
         const SizedBox(width: 12),
         const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'FleetOS',
-              style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w800,
-                color: Color(0xFF111827), letterSpacing: -0.3,
-              ),
-            ),
-            Text(
-              'Logistics Platform',
-              style: TextStyle(
-                fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w400,
-              ),
-            ),
+            Text('FleetOS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF111827), letterSpacing: -0.3)),
+            Text('Logistics Platform', style: TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w400)),
           ],
         ),
       ],
@@ -321,9 +293,7 @@ class _ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                fontSize: 13, color: Color(0xFFE02424), height: 1.4,
-              ),
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE02424), height: 1.4),
             ),
           ),
         ],
