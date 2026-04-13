@@ -5,14 +5,6 @@ import '../../../shared/theme/app_theme.dart';
 import '../../../core/network/api_shipment.dart';
 import '../../../core/network/api_client.dart';
 import '../models/shipment_draft.dart';
-import 'package:provider/provider.dart';
-import '../../../app_session.dart';
-import '../../../shared/theme/app_theme.dart';
-import '../../../core/network/api_shipment.dart';
-import '../../../core/network/api_client.dart';
-import '../models/shipment_draft.dart';
-
-class SenderHomeScreen extends StatefulWidget {
 class SenderHomeScreen extends StatefulWidget {
   const SenderHomeScreen({super.key});
 

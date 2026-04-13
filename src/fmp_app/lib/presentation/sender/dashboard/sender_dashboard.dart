@@ -4,6 +4,7 @@ import '../create/sender_create_shipment_screen.dart';
 import '../shipments/sender_shipments_screen.dart';
 import '../billing/sender_billing_screen.dart';
 import '../profile/sender_profile_screen.dart';
+import '../search/sender_search_screen.dart';
 import '../../../shared/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ class _SenderDashboardScreenState extends State<SenderDashboardScreen> {
     SenderShipmentsScreen(),
     SenderBillingScreen(),
     SenderProfileScreen(),
+    SenderSearchScreen(),
   ];
 
   static const _items = [
@@ -34,6 +36,7 @@ class _SenderDashboardScreenState extends State<SenderDashboardScreen> {
     _NavItem(Icons.local_shipping_rounded,Icons.local_shipping_outlined,'Shipments'),
     _NavItem(Icons.receipt_long_rounded,  Icons.receipt_long_outlined, 'Billing'),
     _NavItem(Icons.business_rounded,      Icons.business_outlined,     'Profile'),
+    _NavItem(Icons.search_rounded,        Icons.search_outlined,       'Search'),
   ];
 
   @override

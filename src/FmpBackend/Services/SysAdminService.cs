@@ -78,6 +78,23 @@ public class SysAdminService
         });
     }
 
+    /// <summary>
+    /// Search users by free-text (name/phone) and optionally filter by role.
+    /// Role lookup uses the user_roles join table.
+    /// </summary>
+    public async Task<IEnumerable<object>> SearchUsersAsync(string? q, string? role)
+    {
+        var users = await _users.SearchAsync(q, role);
+        return users.Select(u => (object)new
+        {
+            u.Id,
+            u.FullName,
+            u.Phone,
+            Role = role ?? "",   // echo back filtered role for display
+            u.CreatedAt
+        });
+    }
+
     // ── Shipments ─────────────────────────────────────────────────────────────
 
     public async Task<List<object>> GetShipmentsAsync(string? status)

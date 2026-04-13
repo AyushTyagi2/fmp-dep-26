@@ -3,6 +3,7 @@ import '../union_queue/queue.dart';
 import '../union_request/request.dart';
 import '../union_profile/profile.dart';
 import '../union_home/home.dart';
+import '../search/union_search_screen.dart';
 import '../../../shared/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
     QueueScreen(driverId: widget.driverId),
     const UnionRequestScreen(),
     const UnionProfileScreen(),
+    const UnionSearchScreen(),
   ];
 
   static const _items = [
@@ -33,6 +35,7 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
     (Icons.inbox_rounded,   Icons.inbox_outlined,           'Queue'),
     (Icons.folder_rounded,  Icons.folder_outlined,          'Requests'),
     (Icons.person_rounded,  Icons.person_outline_rounded,   'Profile'),
+    (Icons.search_rounded,  Icons.search_outlined,          'Search'),
   ];
 
   @override

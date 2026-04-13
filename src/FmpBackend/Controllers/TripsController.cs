@@ -39,4 +39,17 @@ public class TripsController : ControllerBase
     [HttpGet("driver/{driverId:guid}")]
     public async Task<IActionResult> GetByDriver(Guid driverId)
         => Ok(await _svc.GetByDriverAsync(driverId));
+
+    /// <summary>
+    /// Driver trip search — GET /api/trips/search?driverId=&amp;q=&amp;status=
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<IActionResult> SearchTrips(
+        [FromQuery] Guid driverId,
+        [FromQuery] string? q = null,
+        [FromQuery] string? status = null)
+    {
+        var result = await _svc.SearchByDriverAsync(driverId, q, status);
+        return Ok(result);
+    }
 }

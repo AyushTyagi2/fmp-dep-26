@@ -4,6 +4,7 @@ import 'package:fmp_app/presentation/sys_admin_dashboard/views/users_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/logs_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/queue_view.dart';
 import 'package:fmp_app/presentation/sys_admin_dashboard/views/rules_view.dart';
+import 'package:fmp_app/presentation/sys_admin_dashboard/views/search_view.dart';
 import 'package:fmp_app/shared/profile/common_profile_screen.dart';
 import 'package:fmp_app/app_session.dart';
 import '../../../shared/theme/app_theme.dart';
@@ -25,15 +26,17 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
 
   static const _views = [
     OverviewView(),
+    SearchView(),    // index 1 — Search
     UsersView(),
     LogsView(),
     QueueView(),
     RulesView(),
-    CommonProfileScreen(), // index 5
+    CommonProfileScreen(), // index 6
   ];
 
   static const _navItems = [
     _NavEntry(Icons.dashboard_rounded,            Icons.dashboard_outlined,          'Overview',     'Platform metrics & recent activity'),
+    _NavEntry(Icons.manage_search_rounded,        Icons.manage_search_rounded,       'Search',       'Find users by name, phone, or role'),
     _NavEntry(Icons.people_rounded,               Icons.people_outline_rounded,      'Users',        'Search and manage all users'),
     _NavEntry(Icons.history_rounded,              Icons.history_outlined,            'System Logs',  'Audit trail and event history'),
     _NavEntry(Icons.inbox_rounded,                Icons.inbox_outlined,              'Queue',        'Shipment approval & management'),
@@ -300,10 +303,10 @@ class _AdminAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Tap avatar → jump straight to Profile (index 5)
+        // Tap avatar → jump straight to Profile (index 6)
         final state = context
             .findAncestorStateOfType<_SysAdminDashboardScreenState>();
-        state?.setState(() => state._selectedIndex = 5);
+        state?.setState(() => state._selectedIndex = 6);
       },
       child: Container(
         width: 36,

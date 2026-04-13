@@ -142,6 +142,30 @@ public class TripService
     public async Task<List<TripDto>> GetByDriverAsync(Guid driverId) =>
         (await _repo.GetByDriverAsync(driverId)).Select(ToDto).ToList();
 
+    /// <summary>
+    /// Driver trip search: filters a driver's own trips by free-text (tripNumber, shipmentNumber)
+    /// and optionally by status.
+    /// </summary>
+    public async Task<List<TripDto>> SearchByDriverAsync(Guid driverId, string? q, string? status)
+    {
+        var trips = await _repo.GetByDriverAsync(driverId);
+
+        IEnumerable<Trip> result = trips;
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var lower = q.ToLower();
+            result = result.Where(t =>
+                t.TripNumber.ToLower().Contains(lower) ||
+                (t.Shipment?.ShipmentNumber?.ToLower().Contains(lower) ?? false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+            result = result.Where(t => t.CurrentStatus == status);
+
+        return result.Select(ToDto).ToList();
+    }
+
     private static TripDto ToDto(Trip t) => new(
         t.Id, t.TripNumber, t.ShipmentId, t.Shipment?.ShipmentNumber ?? "",
         t.VehicleId, t.DriverId, t.AssignedUnionId, t.AssignedFleetOwnerId,

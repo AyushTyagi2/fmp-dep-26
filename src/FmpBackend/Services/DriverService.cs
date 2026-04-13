@@ -97,6 +97,34 @@ public class DriverService
         return GetDriversForFleetOwner(f.Id);
     }
 
+    /// <summary>
+    /// Fleet Manager driver search: filters drivers by free-text (name, phone) and optional status.
+    /// </summary>
+    public IEnumerable<DriverDetailsDto> SearchDriversForFleetOwnerByPhone(
+        string phone,
+        string? q,
+        string? status)
+    {
+        var f = _fleets.GetByPhone(phone);
+        if (f == null) return Enumerable.Empty<DriverDetailsDto>();
+
+        var drivers = GetDriversForFleetOwner(f.Id);
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var lower = q.ToLower();
+            drivers = drivers.Where(d =>
+                d.FullName.ToLower().Contains(lower) ||
+                d.Phone.ToLower().Contains(lower) ||
+                d.Id.ToString().Contains(lower));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+            drivers = drivers.Where(d => d.Status?.ToLower() == status.ToLower());
+
+        return drivers;
+    }
+
     public FleetDashboardDto GetFleetDashboardByPhone(string phone)
     {
         var f = _fleets.GetByPhone(phone);

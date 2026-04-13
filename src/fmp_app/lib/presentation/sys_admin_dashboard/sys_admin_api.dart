@@ -24,6 +24,20 @@ class SysAdminApi {
     return List<dynamic>.from(res.data['users'] ?? []);
   }
 
+  /// Search users via backend — GET /sysadmin/users/search?q=&role=
+  Future<List<dynamic>> searchUsers({String? q, String? role}) async {
+    final params = <String, dynamic>{};
+    if (q != null && q.isNotEmpty) params['q'] = q;
+    if (role != null && role.isNotEmpty && role != 'All') params['role'] = role;
+    final res = await _client.dio.get(
+      '/sysadmin/users/search',
+      queryParameters: params.isEmpty ? null : params,
+    );
+    final data = res.data;
+    if (data is List) return data;
+    return List<dynamic>.from(data['users'] ?? []);
+  }
+
   // ── Shipments ──────────────────────────────────────────────────────────────
 
   Future<List<dynamic>> getShipments({String? status}) async {

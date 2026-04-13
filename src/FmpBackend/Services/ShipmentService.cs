@@ -104,6 +104,89 @@ public class ShipmentService
         };
     }
 
+    /// <summary>
+    /// Sender search: returns sent + received shipments filtered by q/status/cargoType/urgent.
+    /// </summary>
+    public async Task<object> SearchShipmentsAsync(
+        string phone,
+        string? q,
+        string? status,
+        string? cargoType,
+        bool? urgent)
+    {
+        var org = await _orgRepo.GetByPhoneAsync(phone);
+        if (org == null) throw new Exception("Organization not found");
+
+        var sent     = await _ship.GetSentShipmentsAsync(org.Id);
+        var received = await _ship.GetReceivedShipmentsAsync(org.Id);
+
+        IEnumerable<Shipment> FilterList(IEnumerable<Shipment> list)
+        {
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var lower = q.ToLower();
+                list = list.Where(s =>
+                    (s.ShipmentNumber?.ToLower().Contains(lower) ?? false) ||
+                    (s.CargoType?.ToLower().Contains(lower) ?? false) ||
+                    (s.Status?.ToLower().Contains(lower) ?? false));
+            }
+            if (!string.IsNullOrWhiteSpace(status))
+                list = list.Where(s => s.Status == status);
+            if (!string.IsNullOrWhiteSpace(cargoType))
+                list = list.Where(s => s.CargoType?.ToLower() == cargoType.ToLower());
+            if (urgent == true)
+                list = list.Where(s => s.IsUrgent);
+            return list;
+        }
+
+        var filteredSent     = FilterList(sent).Select(s => new { s.Id, s.ShipmentNumber, s.CargoType, s.Status, s.IsUrgent, s.AgreedPrice, s.CreatedAt });
+        var filteredReceived = FilterList(received).Select(s => new { s.Id, s.ShipmentNumber, s.CargoType, s.Status, s.IsUrgent, s.AgreedPrice, s.CreatedAt });
+
+        return new { sent = filteredSent, received = filteredReceived };
+    }
+
+    /// <summary>
+    /// Union queue search: full-text + optional status/cargoType/urgent filters across all shipments.
+    /// </summary>
+    public async Task<List<object>> SearchQueueShipmentsAsync(
+        string? q,
+        string? status,
+        string? cargoType,
+        bool? urgent)
+    {
+        // Get all shipments (or scoped to pending_approval queue if no status provided)
+        var all = string.IsNullOrWhiteSpace(status)
+            ? await _ship.GetAllAsync()
+            : await _ship.GetByStatusAsync(status);
+
+        IEnumerable<Shipment> result = all;
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var lower = q.ToLower();
+            result = result.Where(s =>
+                (s.ShipmentNumber?.ToLower().Contains(lower) ?? false) ||
+                (s.CargoType?.ToLower().Contains(lower) ?? false));
+        }
+        if (!string.IsNullOrWhiteSpace(cargoType))
+            result = result.Where(s => s.CargoType?.ToLower() == cargoType.ToLower());
+        if (urgent == true)
+            result = result.Where(s => s.IsUrgent);
+
+        return result
+            .Select(s => (object)new
+            {
+                s.Id,
+                s.ShipmentNumber,
+                s.CargoType,
+                s.CargoWeightKg,
+                s.Status,
+                s.IsUrgent,
+                s.CreatedAt
+            })
+            .ToList();
+    }
+
     public async Task<List<object>> GetPendingShipmentsAsync()
     {
         var shipments = await _ship.GetByStatusAsync("pending_approval");
