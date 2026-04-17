@@ -4,7 +4,6 @@ import 'package:fmp_app/presentation/fleetmgr/drivers/fleet_drivers_screen.dart'
 import 'package:fmp_app/presentation/fleetmgr/vehicles/fleet_vehicles_screen.dart';
 import 'package:fmp_app/presentation/fleetmgr/trips/fleet_trips_screen.dart';
 import 'package:fmp_app/presentation/fleetmgr/profile/fleet_profile_screen.dart';
-import 'package:fmp_app/presentation/fleetmgr/search/fleet_search_screen.dart';
 import 'package:fmp_app/core/models/fleet_dashboard.dart';
 import 'package:fmp_app/presentation/fleetmgr/fleet_api.dart';
 import 'package:fmp_app/app_session.dart';
@@ -33,7 +32,6 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
     FleetVehiclesScreen(),
     FleetTripsScreen(),
     FleetProfileScreen(),
-    FleetSearchScreen(),
   ];
 
   void _onItemTapped(int idx) => setState(() => _index = idx);
@@ -107,7 +105,6 @@ class _FleetDashboardScreenState extends State<FleetDashboardScreen> {
       (Icons.local_shipping_rounded,   Icons.local_shipping_outlined,   'Vehicles'),
       (Icons.receipt_long_rounded,     Icons.receipt_long_outlined,     'Trips'),
       (Icons.person_rounded,           Icons.person_outline_rounded,    'Profile'),
-      (Icons.search_rounded,           Icons.search_outlined,           'Search'),
     ];
 
     return Container(

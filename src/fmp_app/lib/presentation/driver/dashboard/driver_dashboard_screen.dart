@@ -3,7 +3,6 @@ import 'package:fmp_app/app_session.dart';
 import 'package:fmp_app/core/network/api_client.dart';
 import 'package:fmp_app/core/network/api_trips.dart';
 import 'package:fmp_app/presentation/driver/profile/driver_profile_screen.dart';
-import 'package:fmp_app/presentation/driver/search/driver_search_screen.dart';
 
 // lib/presentation/driver/dashboard/driver_dashboard_screen.dart
 
@@ -54,8 +53,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
       const SizedBox.shrink(),
       // index 2 — Profile
       const DriverProfileScreen(),
-      // index 3 — Search
-      const DriverSearchScreen(),
+    
 
     ];
 
@@ -489,7 +487,6 @@ class _DriverBottomNav extends StatelessWidget {
           BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.queue_rounded), label: 'Queue'),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.search_rounded), label: 'Search'),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long_rounded), label: 'Billing'),
         ],
       ),
