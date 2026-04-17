@@ -40,6 +40,11 @@ public class UserRepository
         return _db.Users.FirstOrDefault(u => u.Phone == phone);
     }
 
+    public async Task<User?> GetByPhoneAsync(string phone)
+    {
+        return await _db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+    }
+
     // ── Other lookups ─────────────────────────────────────────────────────────
 
     public User? GetById(Guid id)

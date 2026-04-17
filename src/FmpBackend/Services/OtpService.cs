@@ -1,17 +1,18 @@
 using FmpBackend.Repositories;
 using FmpBackend.Models;
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 
 namespace FmpBackend.Services;
 
 /// <summary>
 /// OTP flow:
-///  1. GenerateOtp(email)  — creates a 6-digit code, stores it in-memory with a 10-min TTL,
-///                           and sends it via email (configure SMTP in appsettings.json).
-///  2. VerifyOtp(email, otp) — validates code + expiry, creates user if new, returns the User.
+///  1. GenerateOtp(email) — creates a 6-digit code, stores it in-memory with
+///     a 10-min TTL, prints it to the console, and sends it via SMTP email.
+///  2. VerifyOtp(email, otp) — validates code + expiry, creates user if new.
 ///
-/// SMTP config required in appsettings.json:
+/// SMTP config (appsettings.json):
 /// {
 ///   "Smtp": {
 ///     "Host": "smtp.gmail.com",
@@ -22,8 +23,8 @@ namespace FmpBackend.Services;
 ///   }
 /// }
 ///
-/// NOTE: In-memory storage works for a single-instance deployment.
-/// For multi-instance / serverless, swap _store for Redis or a DB table.
+/// NOTE: Console.WriteLine always prints the OTP so you can test locally
+/// even when SMTP is not configured.
 /// </summary>
 public class OtpService
 {
@@ -45,6 +46,8 @@ public class OtpService
         _config   = config;
     }
 
+    // ── Generate & send ───────────────────────────────────────────────────────
+
     public void GenerateOtp(string email)
     {
         var otp = Random.Shared.Next(100_000, 999_999).ToString();
@@ -54,68 +57,78 @@ public class OtpService
             _store[email] = (otp, DateTime.UtcNow.AddMinutes(OtpExpiryMinutes), 0);
         }
 
-        // Log to console for local dev — real email send below
-        Console.WriteLine($"[OTP] {email} → {otp}  (valid for {OtpExpiryMinutes} min)");
+        // ✅ Always log — equivalent to console.log() in Node/nodemailer setups
+        Console.WriteLine("╔══════════════════════════════════════╗");
+        Console.WriteLine($"║  OTP for {email,-28}║");
+        Console.WriteLine($"║  Code : {otp,-31}║");
+        Console.WriteLine($"║  Valid: {OtpExpiryMinutes} minutes                        ║");
+        Console.WriteLine("╚══════════════════════════════════════╝");
 
+        // Also attempt SMTP delivery (non-blocking — a failure won't throw)
         SendOtpEmail(email, otp);
     }
 
+    // ── SMTP email send ───────────────────────────────────────────────────────
+
     private void SendOtpEmail(string toEmail, string otp)
+{
+    var host = _config["Smtp:Host"];
+    var port = int.TryParse(_config["Smtp:Port"], out var p) ? p : 587;
+    var user = _config["Smtp:User"];
+    var pass = _config["Smtp:Pass"];
+    var from = _config["Smtp:From"] ?? user;
+
+    if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user))
     {
-        var host = _config["Smtp:Host"];
-        var port = int.TryParse(_config["Smtp:Port"], out var p) ? p : 587;
-        var user = _config["Smtp:User"];
-        var pass = _config["Smtp:Pass"];
-        var from = _config["Smtp:From"] ?? user;
-
-        // If SMTP is not configured, skip sending (OTP still printed to console)
-        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user))
-        {
-            Console.WriteLine("[OTP] SMTP not configured — skipping email send.");
-            return;
-        }
-
-        try
-        {
-            using var client = new SmtpClient(host, port)
-            {
-                Credentials    = new NetworkCredential(user, pass),
-                EnableSsl      = true,
-                DeliveryMethod = SmtpDeliveryMethod.Network,
-            };
-
-            var body = $@"
-<div style='font-family:sans-serif;max-width:480px;margin:auto'>
-  <h2 style='color:#1A56DB'>Your FleetOS verification code</h2>
-  <p style='font-size:15px;color:#374151'>Use the code below to sign in. It expires in {OtpExpiryMinutes} minutes.</p>
-  <div style='background:#EBF0FE;border-radius:12px;padding:24px;text-align:center;margin:24px 0'>
-    <span style='font-size:36px;font-weight:800;letter-spacing:8px;color:#1A56DB'>{otp}</span>
-  </div>
-  <p style='font-size:13px;color:#9CA3AF'>If you did not request this code, you can safely ignore this email.</p>
-</div>";
-
-            var msg = new MailMessage
-            {
-                From       = new MailAddress(from!),
-                Subject    = $"{otp} is your FleetOS verification code",
-                Body       = body,
-                IsBodyHtml = true,
-            };
-            msg.To.Add(toEmail);
-
-            client.Send(msg);
-            Console.WriteLine($"[OTP] Email sent to {toEmail}");
-        }
-        catch (Exception ex)
-        {
-            // Don't throw — OTP is still valid, user sees console log in dev
-            Console.WriteLine($"[OTP] Email send failed: {ex.Message}");
-        }
+        Console.WriteLine("[OTP] SMTP not configured.");
+        return;
     }
+
+    try
+    {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse(from));
+        message.To.Add(MailboxAddress.Parse(toEmail));
+        message.Subject = $"{otp} is your FleetOS verification code";
+
+        var body = $@"
+        <div style='font-family:sans-serif;max-width:480px;margin:auto'>
+            <h2>Your FleetOS verification code</h2>
+            <p>This OTP is valid for {OtpExpiryMinutes} minutes.</p>
+
+            <div style='background:#EBF0FE;padding:20px;text-align:center'>
+                <h1 style='letter-spacing:8px'>{otp}</h1>
+            </div>
+
+            <p>If you didn't request this code you can ignore this email.</p>
+        </div>";
+
+        message.Body = new TextPart("html")
+        {
+            Text = body
+        };
+
+        using var client = new SmtpClient();
+
+        client.Connect(host, port, SecureSocketOptions.StartTls);
+        client.Authenticate(user, pass);
+        client.Send(message);
+        client.Disconnect(true);
+
+        Console.WriteLine($"[OTP] Email sent to {toEmail}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[OTP] Email send failed: {ex.Message}");
+    }
+}
+
+    // ── Verify ────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Returns the authenticated User on success.
-    /// Throws InvalidOperationException with a human-readable message on failure.
+    /// Throws InvalidOperationException with a user-readable message on failure.
+    /// Creates a new user record on first-time sign-in (same as phone-based onboarding).
     /// </summary>
     public User VerifyOtp(string email, string otp)
     {
@@ -139,11 +152,14 @@ public class OtpService
                 throw new InvalidOperationException("Incorrect OTP.");
             }
 
-            // Success — remove from store so it can't be reused
+            // Consumed — remove so it can't be reused
             _store.Remove(email);
         }
 
-        // Create user if first-time login
+        // ── Upsert user ──────────────────────────────────────────────────────
+        // Existing users (e.g. migrated from phone): their email is already in
+        // the users table, so GetByEmail finds them and we skip Create.
+        // New users: we create a fresh record just like the old phone flow did.
         var user = _userRepo.GetByEmail(email);
         if (user == null)
         {
@@ -154,9 +170,15 @@ public class OtpService
                 Email        = email,
                 PasswordHash = string.Empty,
                 AuthProvider = "email_otp",
-                FullName     = $"user_{id.ToString()[..8]}"
+                FullName     = $"user_{id.ToString()[..8]}",
+                CreatedAt    = DateTime.UtcNow,
             };
             _userRepo.Create(user);
+            Console.WriteLine($"[OTP] New user created for {email}");
+        }
+        else
+        {
+            Console.WriteLine($"[OTP] Existing user authenticated: {email}");
         }
 
         return user;

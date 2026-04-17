@@ -10,6 +10,8 @@ class AuthApi {
     ),
   );
 
+  // ── Email OTP flow (unchanged) ────────────────────────────────────────────
+
   Future<void> requestOtp(String email) async {
     await _dio.post(
       "/auth/request-otp",
@@ -20,9 +22,24 @@ class AuthApi {
   }
 
   Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
-    final res = await _dio.post("/auth/verify-otp", data: {"email": email, "otp": otp});
+    final res =
+        await _dio.post("/auth/verify-otp", data: {"email": email, "otp": otp});
     return Map<String, dynamic>.from(res.data);
   }
+
+  // ── Google Sign-In ────────────────────────────────────────────────────────
+
+  /// Sends the Google ID token to the backend.
+  /// Returns { email, token, driverId? }
+  Future<Map<String, dynamic>> signInWithGoogle(String idToken) async {
+    final res = await _dio.post(
+      "/auth/google",
+      data: {"idToken": idToken},
+    );
+    return Map<String, dynamic>.from(res.data);
+  }
+
+  // ── Shared ────────────────────────────────────────────────────────────────
 
   Future<void> submitDriverDetails({
     required String email,

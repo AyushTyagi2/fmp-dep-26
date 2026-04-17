@@ -45,13 +45,14 @@ builder.Services.AddControllers()
 // CORS — allow Flutter app origin
 builder.Services.AddCors(options =>
     options.AddPolicy("AllowFlutter", policy =>
-        policy.SetIsOriginAllowed(_ => true)   // allow any localhost port (Flutter web/desktop)
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials()));
 
 // ── Dependency Injection ──────────────────────────────────────────────────────
 builder.Services.AddScoped<OtpService>();
+builder.Services.AddScoped<GoogleAuthService>();          // ← NEW
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<DriverService>();
 builder.Services.AddScoped<DriverRepository>();
@@ -72,8 +73,8 @@ builder.Services.AddScoped<DriverQueueRepository>();
 builder.Services.AddScoped<QueueEventRepository>();
 builder.Services.AddScoped<DriverEligibleRepository>();
 builder.Services.AddScoped<QueueEventService>();
-builder.Services.AddScoped<SystemLogRepository>(); // ← NEW
-builder.Services.AddScoped<SystemLogService>();    // ← NEW
+builder.Services.AddScoped<SystemLogRepository>();
+builder.Services.AddScoped<SystemLogService>();
 builder.Services.AddScoped<SysAdminService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddHostedService<QueueMaintenanceWorker>();
