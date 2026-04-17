@@ -29,7 +29,7 @@ class _FleetDriversScreenState extends State<FleetDriversScreen> {
   }
 
   Future<void> _loadDrivers() async {
-    final phone = AppSession.phone;
+    final phone = AppSession.email;
     if (phone == null) return;
     setState(() => _loading = true);
     try {

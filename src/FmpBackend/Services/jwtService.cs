@@ -14,7 +14,7 @@ public class JwtService
         _secret = config["Jwt:Key"] ?? "super-secret-key-change-in-production";
     }
 
-    public string Generate(string phone, string role)
+    public string Generate(string email, string role)
     {
         var key   = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -22,7 +22,7 @@ public class JwtService
         var token = new JwtSecurityToken(
             claims:
             [
-                new Claim("phone", phone),
+                new Claim("email", email),
                 new Claim("role",  role),
                 // ClaimTypes.Role is what [Authorize(Roles = "...")] reads
                 new Claim(ClaimTypes.Role, role.ToUpperInvariant()),

@@ -32,7 +32,10 @@ public record TripDto(
     string? IssueDescription,
     DateTime CreatedAt,
     DateTime UpdatedAt,
-    DateTime? CompletedAt
+    DateTime? CompletedAt,
+
+    string SenderName,
+    string ReceiverName
 );
 
 public record CreateTripRequest(

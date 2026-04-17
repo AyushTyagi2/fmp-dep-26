@@ -3,6 +3,9 @@ namespace FmpBackend.Models;
 public class Shipment
 {
     public Guid Id { get; set; }
+    // Add these two properties (after ReceiverOrganizationId)
+    public Organization? SenderOrganization { get; set; }
+    public Organization? ReceiverOrganization { get; set; }
     public string ShipmentNumber { get; set; } = default!;
 
     public Guid SenderOrganizationId { get; set; }

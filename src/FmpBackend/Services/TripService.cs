@@ -174,5 +174,7 @@ public class TripService
         t.CurrentLatitude, t.CurrentLongitude, t.LastLocationUpdateAt,
         t.DeliveredAt, t.DeliveredToName, t.ProofOfDeliveryUrl, t.DeliveryNotes,
         t.SenderRating, t.ReceiverRating, t.DriverPaymentAmount, t.DriverPaymentStatus,
-        t.HasIssues, t.IssueDescription, t.CreatedAt, t.UpdatedAt, t.CompletedAt);
+        t.HasIssues, t.IssueDescription, t.CreatedAt, t.UpdatedAt, t.CompletedAt, 
+        t.Shipment?.SenderOrganization?.Name ?? "",
+        t.Shipment?.ReceiverOrganization?.Name ?? "");
 }

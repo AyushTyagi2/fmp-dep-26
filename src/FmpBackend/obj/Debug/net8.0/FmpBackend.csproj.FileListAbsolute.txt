@@ -221,3 +221,14 @@ C:\dev\FMP\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\refint\FmpBackend.dll
 C:\dev\FMP\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\FmpBackend.pdb
 C:\dev\FMP\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\FmpBackend.genruntimeconfig.cache
 C:\dev\FMP\fmp-dep-26\src\FmpBackend\obj\Debug\net8.0\ref\FmpBackend.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\BouncyCastle.Cryptography.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Google.Apis.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Google.Apis.Auth.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Google.Apis.Core.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\MailKit.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\MimeKit.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\Newtonsoft.Json.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\System.Management.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\System.Security.Cryptography.Pkcs.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\runtimes\win\lib\net7.0\System.Management.dll
+C:\Dev\startup\fmp\src\FmpBackend\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.Security.Cryptography.Pkcs.dll

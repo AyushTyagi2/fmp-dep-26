@@ -334,6 +334,18 @@ class _ActiveTripCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(trip.shipmentNumber, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.circle, size: 8, color: Colors.white54),
+              const SizedBox(width: 6),
+              Expanded(child: Text(trip.senderName, style: const TextStyle(fontSize: 12, color: Colors.white70), overflow: TextOverflow.ellipsis)),
+              const Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white54),
+              const SizedBox(width: 6),
+              Expanded(child: Text(trip.receiverName, style: const TextStyle(fontSize: 12, color: Colors.white70), overflow: TextOverflow.ellipsis)),
+              const Icon(Icons.circle, size: 8, color: Colors.white54),
+            ],
+          ),
           if (trip.agreedPrice != null) ...[
             const SizedBox(height: 4),
             Text('₹${trip.agreedPrice!.toStringAsFixed(0)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
@@ -352,7 +364,6 @@ class _ActiveTripCard extends StatelessWidget {
     );
   }
 }
-
 class _TripCard extends StatelessWidget {
   final TripSummary trip;
   final Future<void> Function()? onRefresh;
@@ -362,45 +373,165 @@ class _TripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCompleted = trip.currentStatus == 'completed' || trip.currentStatus == 'delivered';
     final (statusBg, statusText, statusLabel) = _statusStyle(trip.currentStatus);
+
     return GestureDetector(
       onTap: () async {
-        final needsRefresh = await Navigator.pushNamed(
-          context, '/trip-detail', arguments: trip.id,
-        );
+        final needsRefresh = await Navigator.pushNamed(context, '/trip-detail', arguments: trip.id);
         if (needsRefresh == true) onRefresh?.call();
       },
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE5E9F0)), boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2))]),
-        child: Row(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: trip.hasIssues ? const Color(0xFFFBD5D5) : const Color(0xFFE5E9F0)),
+          boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(color: isCompleted ? const Color(0xFFDEF7EC) : const Color(0xFFEBF0FE), borderRadius: BorderRadius.circular(10)),
-              child: Icon(isCompleted ? Icons.check_circle_rounded : Icons.local_shipping_rounded, size: 20, color: isCompleted ? const Color(0xFF0E9F6E) : const Color(0xFF1A56DB)),
+            // ── Row 1: icon + trip info + status ──
+            Row(
+              children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: isCompleted ? const Color(0xFFDEF7EC) : const Color(0xFFEBF0FE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isCompleted ? Icons.check_circle_rounded : Icons.local_shipping_rounded,
+                    size: 20,
+                    color: isCompleted ? const Color(0xFF0E9F6E) : const Color(0xFF1A56DB),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(trip.tripNumber, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
+                    Text(trip.shipmentNumber, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                  ]),
+                ),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(100)),
+                    child: Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusText)),
+                  ),
+                  if (trip.agreedPrice != null) ...[
+                    const SizedBox(height: 4),
+                    Text('₹${trip.agreedPrice!.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+                  ],
+                ]),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(trip.tripNumber, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
-                Text(trip.shipmentNumber, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-              ]),
-            ),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(100)),
-                child: Text(statusLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusText)),
+
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: Color(0xFFF3F4F6)),
+            const SizedBox(height: 10),
+
+            // ── Row 2: sender → receiver ──
+            Row(children: [
+              const Icon(Icons.circle, size: 7, color: Color(0xFF1A56DB)),
+              const SizedBox(width: 5),
+              Flexible(child: Text(trip.senderName, style: const TextStyle(fontSize: 12, color: Color(0xFF374151), fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFFADB5BD)),
               ),
-              if (trip.agreedPrice != null) ...[
-                const SizedBox(height: 4),
-                Text('₹${trip.agreedPrice!.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+              Flexible(child: Text(trip.receiverName, style: const TextStyle(fontSize: 12, color: Color(0xFF374151), fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 5),
+              const Icon(Icons.circle, size: 7, color: Color(0xFF0E9F6E)),
+            ]),
+
+            const SizedBox(height: 8),
+
+            // ── Row 3: dates + payment ──
+            Row(children: [
+              if (trip.plannedStartTime != null) ...[
+                const Icon(Icons.calendar_today_rounded, size: 11, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 4),
+                Text(_formatDate(trip.plannedStartTime!),
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                const SizedBox(width: 12),
+              ],
+              if (trip.deliveredAt != null) ...[
+                const Icon(Icons.flag_rounded, size: 11, color: Color(0xFF0E9F6E)),
+                const SizedBox(width: 4),
+                Text(_formatDate(trip.deliveredAt!),
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+                const SizedBox(width: 12),
+              ],
+              if (trip.driverPaymentAmount != null) ...[
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: trip.driverPaymentStatus == 'paid' ? const Color(0xFFDEF7EC) : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(
+                      trip.driverPaymentStatus == 'paid' ? Icons.check_rounded : Icons.schedule_rounded,
+                      size: 10,
+                      color: trip.driverPaymentStatus == 'paid' ? const Color(0xFF057A55) : const Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 3),
+                    Text('₹${trip.driverPaymentAmount!.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: trip.driverPaymentStatus == 'paid' ? const Color(0xFF057A55) : const Color(0xFFD97706),
+                        )),
+                  ]),
+                ),
               ],
             ]),
+
+            // ── Row 4: issue banner (only if hasIssues) ──
+            if (trip.hasIssues) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE8E8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.warning_amber_rounded, size: 13, color: Color(0xFFE02424)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      trip.issueDescription ?? 'Issue reported',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFFE02424)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+
+            // ── Row 5: delivered to (only if delivered) ──
+            if (trip.deliveredToName != null && trip.deliveredToName!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                const Icon(Icons.person_outline_rounded, size: 12, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 4),
+                Text('Delivered to ${trip.deliveredToName}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontStyle: FontStyle.italic)),
+              ]),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime dt) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${dt.day} ${months[dt.month - 1]}';
   }
 
   (Color, Color, String) _statusStyle(String s) {
@@ -415,7 +546,6 @@ class _TripCard extends StatelessWidget {
     }
   }
 }
-
 class _ErrorState extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;

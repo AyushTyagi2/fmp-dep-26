@@ -92,7 +92,7 @@ class _AdminDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = AppSession.phone ?? 'Administrator';
+    final phone = AppSession.email ?? 'Administrator';
 
     return Drawer(
       backgroundColor: const Color(0xFF0F172A),
