@@ -239,7 +239,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                     child: _PhoneButton(
                       onTap: () =>
-                          Navigator.pushNamed(context, AppRouter.phone),
+                          Navigator.pushNamed(context, AppRouter.email),
                     ),
                   ),
 
