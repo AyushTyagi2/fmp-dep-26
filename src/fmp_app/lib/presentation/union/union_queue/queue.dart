@@ -36,9 +36,13 @@ class _QueueScreenState extends State<QueueScreen> {
 
   static const _refreshIntervalSeconds = 5;
 
+  // ─── DEBUG TAG ─────────────────────────────────────────────────────────────
+  static const _tag = '[QueueScreen]';
+
   @override
   void initState() {
     super.initState();
+    debugPrint('$_tag initState called — driverId: ${widget.driverId}');
     _api = ShipmentApiService(ApiClient());
     _loadQueue();
     _fetchLiveStatus();
@@ -47,14 +51,17 @@ class _QueueScreenState extends State<QueueScreen> {
 
   @override
   void dispose() {
+    debugPrint('$_tag dispose called — cancelling auto-refresh timer');
     _autoRefreshTimer?.cancel();
     super.dispose();
   }
 
   void _startAutoRefresh() {
+    debugPrint('$_tag _startAutoRefresh — interval: ${_refreshIntervalSeconds}s');
     _autoRefreshTimer = Timer.periodic(
       const Duration(seconds: _refreshIntervalSeconds),
       (_) {
+        debugPrint('$_tag [AutoRefresh] tick fired');
         _silentRefresh();
         _fetchLiveStatus();
       },
@@ -62,9 +69,12 @@ class _QueueScreenState extends State<QueueScreen> {
   }
 
   Future<void> _loadQueue({int page = 1}) async {
+    debugPrint('$_tag _loadQueue called — page: $page');
     setState(() { _loading = page == 1; _error = null; });
     try {
       final result = await _api.fetchQueue(page: page, pageSize: 20);
+      debugPrint('$_tag _loadQueue SUCCESS — items: ${result.items.length}, '
+          'page: ${result.page}/${result.totalPages}');
       if (!mounted) return;
       setState(() {
         _shipments   = result.items;
@@ -72,40 +82,104 @@ class _QueueScreenState extends State<QueueScreen> {
         _totalPages  = result.totalPages;
         _loading     = false;
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('$_tag _loadQueue ERROR: $e\n$st');
       if (!mounted) return;
       setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
   Future<void> _silentRefresh() async {
-    if (_refreshing) return;
+    if (_refreshing) {
+      debugPrint('$_tag _silentRefresh SKIPPED — already refreshing');
+      return;
+    }
+    debugPrint('$_tag _silentRefresh START');
     setState(() => _refreshing = true);
     try {
       final result = await _api.fetchQueue(page: _currentPage, pageSize: 20);
+      debugPrint('$_tag _silentRefresh SUCCESS — items: ${result.items.length}');
       if (!mounted) return;
       setState(() { _shipments = result.items; });
-    } catch (_) {
-      // silent
+    } catch (e) {
+      debugPrint('$_tag _silentRefresh ERROR (silent): $e');
     } finally {
       if (mounted) setState(() => _refreshing = false);
+      debugPrint('$_tag _silentRefresh DONE');
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // LIVE STATUS FETCH — most likely source of toggle bugs
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _fetchLiveStatus() async {
+    debugPrint('$_tag _fetchLiveStatus called — '
+        'current _isLive: $_isLive, _activeEventId: $_activeEventId, _toggling: $_toggling');
     try {
       final data = await _api.getQueueLiveStatus();
-      if (!mounted) return;
+
+      // ── Raw response dump ─────────────────────────────────────────────────
+      debugPrint('$_tag _fetchLiveStatus RAW response: $data');
+      debugPrint('$_tag   Keys present   : ${data.keys.toList()}');
+      debugPrint('$_tag   isLive raw     : ${data['isLive']}  (runtimeType: ${data['isLive']?.runtimeType})');
+      debugPrint('$_tag   eventId raw    : ${data['eventId']}  (runtimeType: ${data['eventId']?.runtimeType})');
+
+      if (!mounted) {
+        debugPrint('$_tag _fetchLiveStatus — widget unmounted, aborting setState');
+        return;
+      }
+      if (_toggling) {
+        // ⚠️  This is a common bug source: a stale poll arriving mid-toggle
+        // can snap the UI back to the wrong state before the API responds.
+        debugPrint('$_tag _fetchLiveStatus — _toggling is TRUE, '
+            'SKIPPING setState to avoid overwriting optimistic flip. '
+            'Polled isLive=${data['isLive']}, current UI _isLive=$_isLive');
+        return;
+      }
+
+      final polledIsLive  = data['isLive'] as bool? ?? false;
+      final polledEventId = data['eventId'] as String?;
+
+      // ── Detect unexpected state drift ─────────────────────────────────────
+      if (polledIsLive != _isLive) {
+        debugPrint('$_tag ⚠️  STATE DRIFT detected — '
+            'UI _isLive=$_isLive but server says isLive=$polledIsLive. '
+            'Correcting UI.');
+      }
+      if (polledEventId != _activeEventId) {
+        debugPrint('$_tag ⚠️  EVENT ID CHANGED — '
+            'was: $_activeEventId → now: $polledEventId');
+      }
+      if (polledEventId == null) {
+        debugPrint('$_tag ⚠️  eventId is NULL — toggle button will be DISABLED. '
+            'Check that the backend returns a valid eventId field.');
+      }
+
       setState(() {
-        _isLive        = data['isLive'] as bool? ?? false;
-        _activeEventId = data['eventId'] as String?;
+        _isLive        = polledIsLive;
+        _activeEventId = polledEventId;
       });
-    } catch (_) {}
+      debugPrint('$_tag _fetchLiveStatus setState done — '
+          '_isLive: $_isLive, _activeEventId: $_activeEventId');
+    } catch (e, st) {
+      debugPrint('$_tag _fetchLiveStatus ERROR: $e\n$st');
+    }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOGGLE — the main action handler
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _toggleLive() async {
-    if (_toggling) return;
+    debugPrint('$_tag _toggleLive called — '
+        '_toggling: $_toggling, _isLive: $_isLive, _activeEventId: $_activeEventId');
+
+    if (_toggling) {
+      debugPrint('$_tag _toggleLive ABORTED — already toggling');
+      return;
+    }
     if (_activeEventId == null) {
+      debugPrint('$_tag _toggleLive ABORTED — _activeEventId is null. '
+          'The button should be disabled; check hasEvent guard in _LiveToggleButton.');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No queue event found. Create a queue event first.'),
@@ -115,24 +189,59 @@ class _QueueScreenState extends State<QueueScreen> {
       );
       return;
     }
-    setState(() => _toggling = true);
+
+    // ── Optimistic flip ───────────────────────────────────────────────────
+    final previousState = _isLive;
+    final optimisticState = !_isLive;
+    debugPrint('$_tag _toggleLive optimistic flip: $previousState → $optimisticState '
+        '(eventId: $_activeEventId)');
+
+    setState(() {
+      _toggling = true;
+      _isLive   = optimisticState;
+    });
+
     try {
+      debugPrint('$_tag _toggleLive calling api.toggleQueueEvent(${_activeEventId!})');
       final result = await _api.toggleQueueEvent(_activeEventId!);
-      if (!mounted) return;
-      final newStatus = result['status'] as String?;
-      setState(() => _isLive = newStatus == 'live');
+
+      debugPrint('$_tag _toggleLive API response raw: $result');
+      debugPrint('$_tag   status key : ${result['status']}  '
+          '(runtimeType: ${result['status']?.runtimeType})');
+
+      if (!mounted) {
+        debugPrint('$_tag _toggleLive — widget unmounted after API call, aborting');
+        return;
+      }
+
+      final newStatus    = result['status'] as String?;
+      final confirmedLive = newStatus == 'live';
+
+      debugPrint('$_tag _toggleLive confirmedLive=$confirmedLive '
+          '(optimistic was $optimisticState, previous was $previousState)');
+
+      if (confirmedLive != optimisticState) {
+        debugPrint('$_tag ⚠️  OPTIMISTIC MISMATCH — server confirmed $newStatus '
+            'but UI had already flipped to $optimisticState. Correcting.');
+      }
+
+      setState(() => _isLive = confirmedLive);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isLive
+          content: Text(confirmedLive
               ? 'Queue is now LIVE — drivers can see shipments.'
               : 'Queue closed — hidden from drivers.'),
           behavior: SnackBarBehavior.floating,
           backgroundColor:
-              _isLive ? const Color(0xFF057A55) : const Color(0xFF374151),
+              confirmedLive ? const Color(0xFF057A55) : const Color(0xFF374151),
         ),
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('$_tag _toggleLive ERROR: $e\n$st');
+      debugPrint('$_tag _toggleLive rolling back to previousState=$previousState');
       if (!mounted) return;
+      setState(() => _isLive = previousState);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Toggle failed: $e'),
@@ -141,7 +250,11 @@ class _QueueScreenState extends State<QueueScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _toggling = false);
+      if (mounted) {
+        setState(() => _toggling = false);
+        debugPrint('$_tag _toggleLive FINALLY — _toggling reset to false, '
+            'final _isLive: $_isLive');
+      }
     }
   }
 
@@ -309,7 +422,13 @@ class _QueueScreenState extends State<QueueScreen> {
 
 // ─── Live Toggle Button ───────────────────────────────────────────────────────
 
-class _LiveToggleButton extends StatelessWidget {
+// ─── Drop-in replacement for _LiveToggleButton ───────────────────────────────
+// Paste this class over your existing one temporarily.
+// It adds a raw pointer listener OUTSIDE the GestureDetector to catch
+// whether touches are even reaching the widget at all.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LiveToggleButton extends StatefulWidget {
   final bool isLive;
   final bool toggling;
   final bool hasEvent;
@@ -323,53 +442,220 @@ class _LiveToggleButton extends StatelessWidget {
   });
 
   @override
+  State<_LiveToggleButton> createState() => _LiveToggleButtonState();
+}
+
+class _LiveToggleButtonState extends State<_LiveToggleButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _slideAnim;
+
+  late bool _isLive;
+
+  static const _tag     = '[LiveToggleButton]';
+  static const _offColor = Color(0xFF374151);
+  static const _onColor  = Color(0xFF057A55);
+  static const double _trackW   = 100;
+  static const double _thumbD   = 26;
+  static const double _pad      = 4;
+  static const double _thumbOn  = _trackW - _thumbD - (_pad*2); // 73
+  static const double _thumbOff = _pad;                      // 3
+
+  @override
+  void initState() {
+    super.initState();
+    _isLive = widget.isLive;
+    debugPrint('$_tag initState — isLive=$_isLive hasEvent=${widget.hasEvent} '
+        'toggling=${widget.toggling}');
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      value: _isLive ? 1.0 : 0.0,
+    );
+    _slideAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void didUpdateWidget(_LiveToggleButton old) {
+    super.didUpdateWidget(old);
+    if (old.isLive != widget.isLive ||
+        old.toggling != widget.toggling ||
+        old.hasEvent != widget.hasEvent) {
+      debugPrint('$_tag didUpdateWidget — '
+          'isLive: ${old.isLive}→${widget.isLive}  '
+          'toggling: ${old.toggling}→${widget.toggling}  '
+          'hasEvent: ${old.hasEvent}→${widget.hasEvent}');
+    }
+    if (old.isLive != widget.isLive) {
+      _isLive = widget.isLive;
+      _isLive ? _ctrl.forward() : _ctrl.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  // ─── STEP 1: does ANY pointer land on this widget? ───────────────────────
+  void _onPointerDown(PointerDownEvent e) {
+    debugPrint('$_tag ✅ POINTER DOWN at ${e.localPosition} — '
+        'this confirms the widget IS receiving raw touch events');
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    debugPrint('$_tag ✅ POINTER UP at ${e.localPosition}');
+  }
+
+  // ─── STEP 2: does the GestureDetector fire? ──────────────────────────────
+  void _onTapDown(TapDownDetails d) {
+    debugPrint('$_tag ✅ TAP DOWN — GestureDetector recognised a tap start '
+        'at ${d.localPosition}');
+  }
+
+  void _onTap() {
+    debugPrint('$_tag ✅ ON TAP fired — hasEvent=${widget.hasEvent} '
+        'toggling=${widget.toggling}');
+    if (!widget.hasEvent) {
+      debugPrint('$_tag ❌ BLOCKED: hasEvent is FALSE — '
+          '_activeEventId is null on the parent. '
+          'Fix: make sure getQueueLiveStatus() returns a non-null eventId.');
+      return;
+    }
+    if (widget.toggling) {
+      debugPrint('$_tag ❌ BLOCKED: toggling is TRUE — '
+          'a previous toggle has not finished yet.');
+      return;
+    }
+    debugPrint('$_tag ✅ Calling onToggle callback now');
+    widget.onToggle();
+  }
+
+  void _onTapCancel() {
+    debugPrint('$_tag ⚠️  TAP CANCELLED — pointer moved out or another '
+        'gesture won the arena. This is the #1 reason taps silently vanish '
+        'inside AppBar action widgets.');
+  }
+
+  @override
   Widget build(BuildContext context) {
+    debugPrint('$_tag build — isLive=${widget.isLive} '
+        'hasEvent=${widget.hasEvent} toggling=${widget.toggling} '
+        'ctrl=${_ctrl.value.toStringAsFixed(2)}');
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: toggling
-          ? const SizedBox(
-              width: 72,
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            )
-          : GestureDetector(
-              onTap: hasEvent ? onToggle : null,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      child: Listener(
+        // Raw pointer listener — fires even if GestureDetector is blocked
+        onPointerDown: _onPointerDown,
+        onPointerUp:   _onPointerUp,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque, // ← crucial: fills the whole box
+          onTapDown:   _onTapDown,
+          onTap:       _onTap,
+          onTapCancel: _onTapCancel,
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (_, __) {
+              final t         = _slideAnim.value;
+              final thumbLeft = _thumbOff + (_thumbOn - _thumbOff) * t;
+              final bg        = Color.lerp(_offColor, _onColor, t)!;
+
+              return Container(
+                width: _trackW,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: isLive
-                      ? const Color(0xFF057A55)
-                      : const Color(0xFF6B7280),
-                  borderRadius: BorderRadius.circular(20),
+                  color: bg,
+                  borderRadius: BorderRadius.circular(30),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Stack(
                   children: [
-                    if (isLive) _PulsingDot() else const _OfflineDot(),
-                    const SizedBox(width: 6),
-                    Text(
-                      isLive ? 'LIVE' : 'OFFLINE',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                    // LIVE label
+                    Positioned(
+                      left: 10, top: 0, bottom: 0,
+                      child: Opacity(
+                        opacity: t,
+                        child: const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text('LIVE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              )),
+                        ),
+                      ),
+                    ),
+                    // OFF label
+                    Positioned(
+                      right: 10, top: 0, bottom: 0,
+                      child: Opacity(
+                        opacity: 1 - t,
+                        child: const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('OFF',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              )),
+                        ),
+                      ),
+                    ),
+                    // Thumb
+                    Positioned(
+                      left: thumbLeft,
+                      top: _pad,
+                      bottom: _pad,
+                      child: Container(
+                        width: _thumbD,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: widget.toggling
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF374151),
+                                  ),
+                                )
+                              : _isLive
+                                  ? _PulsingDot()
+                                  : Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF9CA3AF),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }
-
 class _OfflineDot extends StatelessWidget {
   const _OfflineDot();
   @override

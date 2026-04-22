@@ -36,11 +36,17 @@ public class OrganizationRepository
     }
 
     public async Task<Organization?> GetByPhoneAsync(string phone)
-    {
-        return await _db.Organizations
-            .FirstOrDefaultAsync(o => o.PrimaryContactPhone == phone);
-    }
-
+{
+    Console.WriteLine($"[OrgRepo] phone bytes: {string.Join(" ", System.Text.Encoding.UTF8.GetBytes(phone).Select(b => b.ToString("X2")))}");
+    
+    // Bypass EF parameterization — raw string interpolation to confirm
+    var raw = await _db.Organizations
+        .FromSqlRaw("SELECT * FROM organizations WHERE primary_contact_phone = {0}", phone)
+        .FirstOrDefaultAsync();
+    
+    Console.WriteLine($"[OrgRepo] Raw SQL result: {(raw == null ? "NULL" : raw.Name)}");
+    return raw;
+}
     // ── Mutations ─────────────────────────────────────────────────────────────
 
     public async Task<Organization> CreateAsync(Organization org)

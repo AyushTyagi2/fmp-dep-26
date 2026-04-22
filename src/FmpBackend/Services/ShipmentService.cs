@@ -34,7 +34,7 @@ public class ShipmentService
     {
         var shipmentNumber = $"SHP-{DateTime.UtcNow.Ticks}";
 
-        var senderOrg = await _orgRepo.GetByPhoneAsync(request.SenderPhone);
+        var senderOrg = await _orgRepo.GetByEmailAsync(request.SenderPhone);
         if (senderOrg == null)
             throw new Exception("Sender organization not found");
 
@@ -42,7 +42,7 @@ public class ShipmentService
         if (receiverOrg == null)
             throw new Exception("Receiver organization not found");
 
-        var user = await _userRepo.GetByPhoneAsync(request.SenderPhone);
+        var user = await _userRepo.GetByEmailAsync(request.SenderPhone);
         if (user == null)
             throw new Exception("User not found");
 
@@ -90,7 +90,7 @@ public class ShipmentService
 
     public async Task<object> GetShipmentsByPhoneAsync(string phone)
     {
-        var org = await _orgRepo.GetByPhoneAsync(phone);
+        var org = await _orgRepo.GetByEmailAsync(phone);
         if (org == null)
             throw new Exception("Organization not found");
 
@@ -114,7 +114,7 @@ public class ShipmentService
         string? cargoType,
         bool? urgent)
     {
-        var org = await _orgRepo.GetByPhoneAsync(phone);
+        var org = await _orgRepo.GetByEmailAsync(phone);
         if (org == null) throw new Exception("Organization not found");
 
         var sent     = await _ship.GetSentShipmentsAsync(org.Id);

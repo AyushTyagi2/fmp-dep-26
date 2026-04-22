@@ -226,6 +226,14 @@ class _ShipmentCard extends StatelessWidget {
     _                               => AppColors.textSecondary,
   };
 
+void _showDetail(BuildContext context, dynamic s) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _ShipmentDetailSheet(shipment: s),
+  );
+}
   String _statusLabel(String status) => status
       .replaceAll('_', ' ')
       .split(' ')
@@ -249,7 +257,7 @@ class _ShipmentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: () {},
+          onTap: () => _showDetail(context, shipment),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
@@ -343,4 +351,188 @@ class _ShipmentCard extends StatelessWidget {
       ),
     );
   }
+}
+class _ShipmentDetailSheet extends StatelessWidget {
+  final dynamic shipment;
+  const _ShipmentDetailSheet({required this.shipment});
+
+  @override
+  Widget build(BuildContext context) {
+    final status = (shipment['status'] as String? ?? 'unknown').toLowerCase();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.92,
+      minChildSize: 0.4,
+      builder: (_, controller) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            const SizedBox(height: 12),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      shipment['shipmentNumber'] ?? '—',
+                      style: AppTextStyles.headingMd,
+                    ),
+                  ),
+                  _StatusChip(status: status),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+
+            // Scrollable content
+            Expanded(
+              child: ListView(
+                controller: controller,
+                padding: const EdgeInsets.all(20),
+                children: [
+                  _DetailSection(title: 'Cargo', rows: [
+                    _Row('Type',        shipment['cargoType']),
+                    _Row('Description', shipment['cargoDescription']),
+                    _Row('Weight',      shipment['cargoWeightKg'] != null
+                        ? '${shipment['cargoWeightKg']} kg' : null),
+                    _Row('Urgent',      shipment['isUrgent'] == true ? 'Yes' : 'No'),
+                  ]),
+                  const SizedBox(height: 20),
+                  _DetailSection(title: 'Pricing', rows: [
+                    _Row('Agreed Price',     shipment['agreedPrice'] != null
+                        ? '₹${shipment['agreedPrice']}' : null),
+                    _Row('Loading Charges',  shipment['loadingCharges'] != null
+                        ? '₹${shipment['loadingCharges']}' : null),
+                    _Row('Unloading Charges',shipment['unloadingCharges'] != null
+                        ? '₹${shipment['unloadingCharges']}' : null),
+                  ]),
+                  const SizedBox(height: 20),
+                  _DetailSection(title: 'Documents', rows: [
+                    _Row('Invoice #',    shipment['invoiceNumber']),
+                    _Row('Invoice Value',shipment['invoiceValue'] != null
+                        ? '₹${shipment['invoiceValue']}' : null),
+                    _Row('E-Way Bill',   shipment['ewayBillNumber']),
+                  ]),
+                  const SizedBox(height: 20),
+                  _DetailSection(title: 'Dates', rows: [
+                    _Row('Created',   shipment['createdAt']),
+                    _Row('Pickup',    shipment['preferredPickupDate']),
+                    _Row('Delivery',  shipment['preferredDeliveryDate']),
+                  ]),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip({required this.status});
+
+  Color get _color => switch (status) {
+    'pending' || 'pending_approval' => AppColors.warning,
+    'approved' || 'assigned'        => AppColors.primary,
+    'in_transit'                    => const Color(0xFF7C3AED),
+    'delivered'                     => AppColors.success,
+    'cancelled' || 'rejected'       => AppColors.error,
+    _                               => AppColors.textSecondary,
+  };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: _color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      border: Border.all(color: _color.withOpacity(0.3)),
+    ),
+    child: Text(
+      status.replaceAll('_', ' ').split(' ')
+          .map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1))
+          .join(' '),
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _color),
+    ),
+  );
+}
+
+class _DetailSection extends StatelessWidget {
+  final String title;
+  final List<Widget> rows;
+  const _DetailSection({required this.title, required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleRows = rows.whereType<_InfoRow>()
+        .where((r) => r.value != null && r.value!.toString().isNotEmpty)
+        .toList();
+    if (visibleRows.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(),
+            style: AppTextStyles.labelSm.copyWith(
+                color: AppColors.textHint, letterSpacing: 1.2)),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              for (int i = 0; i < visibleRows.length; i++) ...[
+                if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+                visibleRows[i],
+              ]
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// helper so _DetailSection can filter null values
+Widget _Row(String label, dynamic value) => _InfoRow(label: label, value: value?.toString());
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String? value;
+  const _InfoRow({required this.label, this.value});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    child: Row(
+      children: [
+        Text(label, style: AppTextStyles.bodyMd),
+        const Spacer(),
+        Text(value ?? '—',
+            style: AppTextStyles.labelMd.copyWith(color: AppColors.textPrimary)),
+      ],
+    ),
+  );
 }

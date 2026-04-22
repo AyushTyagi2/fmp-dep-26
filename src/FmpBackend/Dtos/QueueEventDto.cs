@@ -12,9 +12,17 @@ public record ActiveEventDto(
     int              Position,
     bool             HasClaimed,
     string           OfferStatus,
-    CurrentOfferDto? CurrentOffer   // null when driver has no pending offer
+    CurrentOfferDto? CurrentOffer,   // null when driver has no pending offer
+    List<UpcomingShipmentDto> UpcomingShipments
 );
-
+public record UpcomingShipmentDto(
+    Guid     ShipmentQueueId,
+    string   ShipmentNumber,
+    string   PickupLocation,
+    string   DropLocation,
+    decimal? AgreedPrice,
+    bool     IsUrgent
+);
 /// <summary>
 /// The one shipment currently offered to this driver — pinned at top in Flutter.
 /// </summary>
@@ -32,4 +40,7 @@ public record CurrentOfferDto(
 );
 
 /// <summary>Response body for Pass action.</summary>
-public record PassOfferResponse(bool Success, string? Message);
+/// NextSlot is the driver's updated queue slot returned inline after the pass.
+/// Flutter applies it immediately so the UI jumps straight to the next offer
+/// without a "Waiting for offer" spinner flash.
+public record PassOfferResponse(bool Success, string? Message, ActiveEventDto? NextSlot = null);

@@ -22,10 +22,13 @@ class _DriverQueueScreenState extends State<DriverQueueScreen> {
   late final ShipmentApiService _api;
 
   QueueSlot?  _slot;
-  bool        _loading  = true;
+  bool        _loading      = true;
   String?     _error;
-  bool        _accepting = false;
-  bool        _passing   = false;
+  bool        _accepting    = false;
+  bool        _passing      = false;
+  // Set to true for a brief moment when the driver loses the race on Accept (409).
+  // Shows a grey "Taken" card instead of a red snackbar; auto-clears after refresh.
+  bool        _takenByOther = false;
   Timer?      _pollTimer;
   Timer?      _countdownTimer;
   Duration    _remaining = Duration.zero;
@@ -35,7 +38,7 @@ class _DriverQueueScreenState extends State<DriverQueueScreen> {
     super.initState();
     _api = ShipmentApiService(_apiClient);
     _refresh();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
   }
 
   @override
@@ -82,25 +85,53 @@ class _DriverQueueScreenState extends State<DriverQueueScreen> {
     final driverId = AppSession.driverId;
     if (offer == null || driverId == null) return;
     setState(() => _accepting = true);
-    final result = await _api.acceptShipment(
-      shipmentQueueId: offer.shipmentQueueId,
-      driverId: driverId,
-    );
-    if (!mounted) return;
-    setState(() => _accepting = false);
-    if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Shipment accepted! Trip created.'),
-          backgroundColor: Color(0xFF0E9F6E),
-          behavior: SnackBarBehavior.floating,
-        ),
+    try {
+      final result = await _api.acceptShipment(
+        shipmentQueueId: offer.shipmentQueueId,
+        driverId: driverId,
       );
-      Navigator.pushReplacementNamed(context, '/driver-dashboard');
-    } else {
+      if (!mounted) return;
+      setState(() => _accepting = false);
+
+      if (result.success) {
+        // Happy path — navigate straight to dashboard/trip.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Shipment accepted! Trip created.'),
+            backgroundColor: Color(0xFF0E9F6E),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, '/driver-dashboard');
+
+      } else if (result.wasTaken) {
+        // Race-loss (409): flip the card to grey "Taken" state inline — no snackbar.
+        debugPrint('[Queue] _accept: race lost — flipping to Taken state');
+        setState(() => _takenByOther = true);
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (!mounted) return;
+        setState(() => _takenByOther = false);
+        _refresh();
+
+      } else {
+        // Genuine server error — show snackbar with exact message.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message ?? 'Could not accept shipment'),
+            backgroundColor: const Color(0xFFE02424),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _refresh();
+      }
+    } catch (e, st) {
+      // Network error, 500, timeout, etc. — always reset the button.
+      debugPrint('[Queue] _accept: unexpected error: $e\n$st');
+      if (!mounted) return;
+      setState(() => _accepting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message ?? 'Could not accept shipment'),
+          content: Text('Network error. Please try again.'),
           backgroundColor: const Color(0xFFE02424),
           behavior: SnackBarBehavior.floating,
         ),
@@ -114,13 +145,29 @@ class _DriverQueueScreenState extends State<DriverQueueScreen> {
     final driverId = AppSession.driverId;
     if (offer == null || driverId == null) return;
     setState(() => _passing = true);
-    await _api.passShipment(
+    final result = await _api.passShipment(
       shipmentQueueId: offer.shipmentQueueId,
       driverId: driverId,
     );
     if (!mounted) return;
-    setState(() => _passing = false);
-    _refresh();
+
+    if (result.nextSlot != null) {
+      // Backend returned the updated slot inline — apply it immediately so the
+      // UI jumps straight to the next offer without a "Waiting" spinner flash.
+      debugPrint('[Queue] _pass: nextSlot inline — applying without spinner');
+      setState(() {
+        _passing      = false;
+        _slot         = result.nextSlot;
+        _takenByOther = false;
+      });
+      _startCountdown(result.nextSlot!.currentOffer?.expiresAt);
+      // Still refresh in the background to stay in sync, but don't show loading.
+      _refresh();
+    } else {
+      // No inline slot (older backend or no shipment ready) — regular refresh.
+      setState(() => _passing = false);
+      _refresh();
+    }
   }
 
   @override
@@ -162,6 +209,8 @@ class _DriverQueueScreenState extends State<DriverQueueScreen> {
                       onPass: _pass,
                       accepting: _accepting,
                       passing: _passing,
+                      upcomingShipments: _slot!.upcomingShipments,
+                      takenByOther: _takenByOther,
                     ),
     );
   }
@@ -170,11 +219,15 @@ class _DriverQueueScreenState extends State<DriverQueueScreen> {
 // ── Queue body ────────────────────────────────────────────────────────────────
 
 class _QueueBody extends StatelessWidget {
-  final QueueSlot    slot;
-  final Duration     remaining;
-  final VoidCallback onAccept;
-  final VoidCallback onPass;
-  final bool         accepting, passing;
+  final QueueSlot              slot;
+  final Duration               remaining;
+  final VoidCallback           onAccept;
+  final VoidCallback           onPass;
+  final bool                   accepting, passing;
+  final List<UpcomingShipment> upcomingShipments;
+  // When true, the current offer card is replaced with a grey "Taken" card,
+  // indicating another driver won the race. Cleared after the next refresh.
+  final bool                   takenByOther;
 
   const _QueueBody({
     required this.slot,
@@ -183,6 +236,8 @@ class _QueueBody extends StatelessWidget {
     required this.onPass,
     required this.accepting,
     required this.passing,
+    this.upcomingShipments = const [],
+    this.takenByOther      = false,
   });
 
   @override
@@ -196,9 +251,14 @@ class _QueueBody extends StatelessWidget {
           _QueuePositionCard(slot: slot),
           const SizedBox(height: 16),
 
-          // Active offer card or waiting / claimed / closed states
-          if (slot.hasActiveOffer && slot.currentOffer != null) ...[
+          // ── Offer area ──────────────────────────────────────────────────────
+          // Priority: takenByOther > hasActiveOffer > isWindowOpen > claimed > closed
+          if (takenByOther && slot.currentOffer != null) ...[
+            // Race-loss: show grey "Taken" card briefly before next offer loads
+            _TakenCard(offer: slot.currentOffer!),
+          ] else if (slot.hasActiveOffer && slot.currentOffer != null) ...[
             _OfferCard(
+              slot: slot,
               offer: slot.currentOffer!,
               remaining: remaining,
               onAccept: onAccept,
@@ -213,6 +273,12 @@ class _QueueBody extends StatelessWidget {
           ] else ...[
             const _QueueClosed(),
           ],
+
+          // Up-next list — shown whenever there are upcoming shipments to preview
+          if (upcomingShipments.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _UpcomingList(shipments: upcomingShipments),
+          ],
         ],
       ),
     );
@@ -222,7 +288,7 @@ class _QueueBody extends StatelessWidget {
 String _friendlyStatus(String raw) {
   switch (raw) {
     case 'idle':     return 'waiting';
-    case 'expired':  return 'waiting';
+    case 'expired':  return 'still claimable';
     case 'passed':   return 'passed';
     case 'pending':  return 'pending offer';
     case 'accepted': return 'accepted';
@@ -302,9 +368,113 @@ class _QueuePositionCard extends StatelessWidget {
   }
 }
 
+// ── Taken card (race-loss inline state) ──────────────────────────────────────
+//
+// Shown for ~800 ms after a 409 Accept response. Mirrors the offer card's
+// layout so the transition is a same-size colour swap, not a jump in height.
+// No buttons — both Accept and Pass are absent per the spec state table.
+
+class _TakenCard extends StatelessWidget {
+  final CurrentOffer offer;
+  const _TakenCard({required this.offer});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top bar — grey, no timer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(17)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.do_not_disturb_on_rounded,
+                    size: 16, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 6),
+                const Text(
+                  'Taken by another driver',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const Spacer(),
+                // "Taken" badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'TAKEN',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6B7280),
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Body — same structure as _OfferCard but muted, no action buttons
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Opacity(
+              opacity: 0.45,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(offer.shipmentNumber,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF6B7280))),
+                  const SizedBox(height: 4),
+                  if (offer.agreedPrice != null) ...[
+                    Text(
+                      '₹${offer.agreedPrice!.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF111827)),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  _RouteDisplay(
+                      from: offer.pickupLocation, to: offer.dropLocation),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Offer card with countdown ─────────────────────────────────────────────────
 
 class _OfferCard extends StatelessWidget {
+  final QueueSlot    slot;
   final CurrentOffer offer;
   final Duration     remaining;
   final VoidCallback onAccept;
@@ -312,6 +482,7 @@ class _OfferCard extends StatelessWidget {
   final bool         accepting, passing;
 
   const _OfferCard({
+    required this.slot,
     required this.offer,
     required this.remaining,
     required this.onAccept,
@@ -331,23 +502,47 @@ class _OfferCard extends StatelessWidget {
     const urgentColor = Color(0xFFE02424);
     final timerColor =
         remaining.inSeconds < 30 ? urgentColor : const Color(0xFF1A56DB);
-    final isExpired = remaining == Duration.zero && offer.expiresAt != null;
+    // offerStatus == 'expired' means the primary window closed but the shipment
+    // is still in the race (cascade not complete).  The spec says:
+    //   - Amber "Still Claimable" header
+    //   - Accept button: SHOWN and ENABLED
+    //   - Pass button: HIDDEN
+    final isExpiredStatus = slot.offerStatus == 'expired';
+    // Countdown reaches zero before the server sends expired — use both signals.
+    final isExpired = isExpiredStatus || (remaining == Duration.zero && offer.expiresAt != null);
+
+    // Colours driven by the expired/urgent/normal state
+    final headerBg = isExpired
+        ? const Color(0xFFFEF3C7)   // amber tint — "Still Claimable"
+        : offer.isUrgent
+            ? const Color(0xFFFDE8E8)
+            : const Color(0xFFEBF0FE);
+    final headerFg = isExpired
+        ? const Color(0xFF92400E)
+        : offer.isUrgent
+            ? urgentColor
+            : const Color(0xFF1A56DB);
+    final borderColor = isExpired
+        ? const Color(0xFFF59E0B).withOpacity(0.5)
+        : offer.isUrgent
+            ? urgentColor.withOpacity(0.3)
+            : const Color(0xFFE5E9F0);
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: offer.isUrgent
-              ? urgentColor.withOpacity(0.3)
-              : const Color(0xFFE5E9F0),
-          width: offer.isUrgent ? 1.5 : 1,
+          color: borderColor,
+          width: (offer.isUrgent || isExpired) ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: offer.isUrgent
-                ? urgentColor.withOpacity(0.08)
-                : Colors.black.withOpacity(0.05),
+            color: isExpired
+                ? const Color(0xFFF59E0B).withOpacity(0.08)
+                : offer.isUrgent
+                    ? urgentColor.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.05),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -360,30 +555,32 @@ class _OfferCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: offer.isUrgent
-                  ? const Color(0xFFFDE8E8)
-                  : const Color(0xFFEBF0FE),
+              color: headerBg,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(17)),
             ),
             child: Row(
               children: [
                 Icon(
-                  offer.isUrgent
-                      ? Icons.flash_on_rounded
-                      : Icons.local_shipping_rounded,
+                  isExpired
+                      ? Icons.hourglass_bottom_rounded
+                      : offer.isUrgent
+                          ? Icons.flash_on_rounded
+                          : Icons.local_shipping_rounded,
                   size: 16,
-                  color: offer.isUrgent ? urgentColor : const Color(0xFF1A56DB),
+                  color: headerFg,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  offer.isUrgent ? 'Urgent Shipment' : 'New Offer',
+                  isExpired
+                      ? 'Still Claimable'
+                      : offer.isUrgent
+                          ? 'Urgent Shipment'
+                          : 'New Offer',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: offer.isUrgent
-                          ? urgentColor
-                          : const Color(0xFF1A56DB)),
+                      color: headerFg),
                 ),
                 const Spacer(),
                 // ── Countdown timer ────────────────────────────────────
@@ -432,42 +629,48 @@ class _OfferCard extends StatelessWidget {
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 50,
-                        child: OutlinedButton(
-                          onPressed: (passing || isExpired) ? null : onPass,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF6B7280),
-                            side: const BorderSide(
-                                color: Color(0xFFD1D5DB), width: 1.5),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                    // Pass button: HIDDEN when expired (spec state table)
+                    if (!isExpired) ...[
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: OutlinedButton(
+                            onPressed: passing ? null : onPass,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF6B7280),
+                              side: const BorderSide(
+                                  color: Color(0xFFD1D5DB), width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: passing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF6B7280)))
+                                : const Text('Pass',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15)),
                           ),
-                          child: passing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF6B7280)))
-                              : const Text('Pass',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15)),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
+                      const SizedBox(width: 12),
+                    ],
+                    // Accept button: always shown.
+                    // When expired → amber "Claim Now" (still enabled).
+                    // When pending → blue "Accept".
                     Expanded(
-                      flex: 2,
+                      flex: isExpired ? 1 : 2,
                       child: SizedBox(
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: (accepting || isExpired) ? null : onAccept,
+                          onPressed: accepting ? null : onAccept,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isExpired
-                                ? const Color(0xFFD1D5DB)
+                                ? const Color(0xFFF59E0B)
                                 : const Color(0xFF1A56DB),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -484,14 +687,14 @@ class _OfferCard extends StatelessWidget {
                                   children: [
                                     Icon(
                                       isExpired
-                                          ? Icons.timer_off_rounded
+                                          ? Icons.bolt_rounded
                                           : Icons.check_rounded,
                                       size: 18,
                                       color: Colors.white,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      isExpired ? 'Expired' : 'Accept',
+                                      isExpired ? 'Claim Now' : 'Accept',
                                       style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -913,6 +1116,212 @@ class _AlreadyClaimedState extends StatelessWidget {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Upcoming shipments list ───────────────────────────────────────────────────
+//
+// Read-only preview of the next shipments waiting in the pool.
+// Shown below the active offer card (or the waiting placeholder).
+// Drivers cannot interact with these — they are informational only.
+
+class _UpcomingList extends StatelessWidget {
+  final List<UpcomingShipment> shipments;
+  const _UpcomingList({required this.shipments});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Row(
+          children: [
+            Container(
+              width: 3,
+              height: 14,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A56DB),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Up Next',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF374151),
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEBF0FE),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${shipments.length}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1A56DB),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // Cards
+        ...shipments.asMap().entries.map((entry) {
+          final index    = entry.key;
+          final shipment = entry.value;
+          return Padding(
+            padding: EdgeInsets.only(bottom: index < shipments.length - 1 ? 8 : 0),
+            child: _UpcomingShipmentCard(shipment: shipment, index: index),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _UpcomingShipmentCard extends StatelessWidget {
+  final UpcomingShipment shipment;
+  final int              index;
+  const _UpcomingShipmentCard({required this.shipment, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E9F0)),
+      ),
+      child: Row(
+        children: [
+          // Position badge
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F6FA),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                '${index + 2}',   // +2 because 1 is the active offer
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Route
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  shipment.shipmentNumber,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF9CA3AF),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    const Icon(Icons.radio_button_checked,
+                        size: 10, color: Color(0xFF0E9F6E)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        shipment.pickupLocation,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_rounded,
+                        size: 10, color: Color(0xFFE02424)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        shipment.dropLocation,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Right side: price + urgent badge
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (shipment.agreedPrice != null)
+                Text(
+                  '₹${shipment.agreedPrice!.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              if (shipment.isUrgent) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDE8E8),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Urgent',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFE02424),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ],
+              // Lock icon signals read-only
+              const SizedBox(height: 4),
+              const Icon(Icons.lock_outline_rounded,
+                  size: 12, color: Color(0xFFD1D5DB)),
+            ],
           ),
         ],
       ),

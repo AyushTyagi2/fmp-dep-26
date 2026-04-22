@@ -94,16 +94,47 @@ public class ShipmentQueueService
     /// </summary>
     public async Task<(Guid? tripId, string? error)> AcceptAsync(Guid queueItemId, Guid driverId)
     {
-        Console.WriteLine($"=== ACCEPT === QueueItemId:{queueItemId} DriverId:{driverId}");
+        Console.WriteLine($"[Accept] ── START queueItemId={queueItemId} driverId={driverId}");
 
+        // Find any vehicle assigned to this driver, regardless of current status.
+        // We self-heal the on_trip → available transition here in case the queue
+        // self-heal in GetActiveEventForDriverAsync hasn't fired yet (race between
+        // the poll cycle and the driver tapping Accept immediately after re-entering).
         var vehicle = await _db.Vehicles
-            .FirstOrDefaultAsync(v => v.CurrentDriverId == driverId
-                                   && v.AvailabilityStatus == VehicleStatus.Available);
-        if (vehicle == null) return (null, "No available vehicle assigned to this driver.");
+            .FirstOrDefaultAsync(v => v.CurrentDriverId == driverId);
+        if (vehicle == null)
+            return (null, "No vehicle is assigned to you. Please contact your fleet manager.");
+
+        if (vehicle.AvailabilityStatus == VehicleStatus.OnTrip)
+        {
+            // Check whether the trip is genuinely still active.
+            var hasActiveTrip = await _db.Trips.AnyAsync(t =>
+                t.DriverId == driverId &&
+                TripStatus.ActiveStatuses.Contains(t.CurrentStatus));
+
+            if (hasActiveTrip)
+                return (null, "You already have an active trip in progress.");
+
+            // Trip is done but status wasn't reset — fix it inline so Accept can proceed.
+            vehicle.AvailabilityStatus = VehicleStatus.Available;
+            // Also reset the driver record in the same save.
+            var driverToReset = await _db.Drivers.FindAsync(driverId);
+            if (driverToReset != null && driverToReset.AvailabilityStatus == DriverAvailabilityStatus.OnTrip)
+                driverToReset.AvailabilityStatus = DriverAvailabilityStatus.Available;
+            await _db.SaveChangesAsync();
+        }
+
+        if (vehicle.AvailabilityStatus != VehicleStatus.Available)
+        {
+            Console.WriteLine($"[Accept] REJECTED: vehicle not available — status={vehicle.AvailabilityStatus}");
+            return (null, $"Your vehicle is not available (status: {vehicle.AvailabilityStatus}).");
+        }
+        Console.WriteLine($"[Accept] vehicle ok: id={vehicle.Id} status={vehicle.AvailabilityStatus}");
 
         var driver = await _db.Drivers.FindAsync(driverId);
-        if (driver == null) return (null, "Driver record not found.");
-        if (driver.CurrentFleetOwnerId == null) return (null, "Driver is not assigned to a fleet owner.");
+        if (driver == null) { Console.WriteLine("[Accept] REJECTED: driver record not found"); return (null, "Driver record not found."); }
+        if (driver.CurrentFleetOwnerId == null) { Console.WriteLine("[Accept] REJECTED: driver has no fleet owner"); return (null, "Driver is not assigned to a fleet owner."); }
+        Console.WriteLine($"[Accept] driver ok: availabilityStatus={driver.AvailabilityStatus} fleetOwnerId={driver.CurrentFleetOwnerId}");
 
         var activeEvent = await _db.QueueEvents
             .FirstOrDefaultAsync(e => e.Status == QueueEventStatus.Live
@@ -127,12 +158,21 @@ public class ShipmentQueueService
                 if (entry.CurrentOfferedShipmentQueueId != queueItemId)
                     return (null, "You can only accept the shipment currently offered to you.");
 
-                if (entry.OfferStatus != DriverOfferStatus.Pending)
+                Console.WriteLine($"[Accept] entry: offerStatus={entry.OfferStatus} hasClaimed={entry.HasClaimed} currentOfferedId={entry.CurrentOfferedShipmentQueueId}");
+                // Allow Pending (active window) AND Expired (Still Claimable — window closed
+                // but shipment not yet taken by another driver, per the cascade spec).
+                if (entry.OfferStatus != DriverOfferStatus.Pending
+                 && entry.OfferStatus != DriverOfferStatus.Expired)
+                {
+                    Console.WriteLine($"[Accept] REJECTED: offer status not active — {entry.OfferStatus}");
                     return (null, $"Your offer is no longer active (status: {entry.OfferStatus}).");
+                }
+                Console.WriteLine("[Accept] offer validation PASSED");
             }
         }
 
         // ── Race-safe accept ──────────────────────────────────────────────────
+        var losingDriverIds = new List<Guid>();
         for (int attempt = 0; attempt < 3; attempt++)
         {
             await using var tx = await _db.Database.BeginTransactionAsync();
@@ -164,7 +204,7 @@ public class ShipmentQueueService
                         await _db.SaveChangesAsync();
                     }
 
-                    // Close the assignment record
+                    // Close the winning assignment record
                     var assignment = await _db.ShipmentQueueAssignments
                         .FirstOrDefaultAsync(a => a.QueueEventId    == activeEvent.Id
                                                && a.ShipmentQueueId == queueItemId
@@ -175,6 +215,37 @@ public class ShipmentQueueService
                         assignment.Outcome = AssignmentOutcome.Accepted;
                         await _db.SaveChangesAsync();
                     }
+
+                    // Cancel all OTHER pending assignments on the same shipment.
+                    // With parallel offers multiple drivers may hold a Pending assignment
+                    // on the same shipment simultaneously.  Once one driver wins, the
+                    // others' assignments must be cancelled so their next poll clears
+                    // the "Taken" card and re-matches them to a new shipment.
+                    var losingAssignments = await _db.ShipmentQueueAssignments
+                        .Where(a => a.QueueEventId    == activeEvent.Id
+                                 && a.ShipmentQueueId == queueItemId
+                                 && a.DriverId        != driverId
+                                 && a.Outcome         == AssignmentOutcome.Pending)
+                        .ToListAsync();
+                    foreach (var loser in losingAssignments)
+                        loser.Outcome = AssignmentOutcome.Expired;
+
+                    // Reset those drivers to Idle so AssignOffersAsync can re-match them.
+                    losingDriverIds = losingAssignments.Select(a => a.DriverId).ToList();
+                    if (losingDriverIds.Any())
+                    {
+                        var losingEntries = await _db.DriverQueueEntries
+                            .Where(e => e.QueueEventId == activeEvent.Id
+                                     && losingDriverIds.Contains(e.DriverId)
+                                     && e.OfferStatus  == DriverOfferStatus.Pending)
+                            .ToListAsync();
+                        foreach (var loser in losingEntries)
+                        {
+                            loser.OfferStatus                   = DriverOfferStatus.Idle;
+                            loser.CurrentOfferedShipmentQueueId = null;
+                        }
+                    }
+                    await _db.SaveChangesAsync();
                 }
 
                 await tx.CommitAsync();
@@ -193,14 +264,24 @@ public class ShipmentQueueService
                 ));
 
                 await _hub.Clients.All.SendAsync("ShipmentAccepted", queueItemId);
+
+                // Re-match any drivers whose pending assignments were just cancelled
+                // (those who lost the race) so they get a new offer immediately.
+                if (losingDriverIds.Any())
+                    await _queueEventService.AssignOffersAsync(activeEvent);
+
                 return (trip.Id, null);
             }
             catch (DbUpdateConcurrencyException) { await tx.RollbackAsync(); }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception: {ex.Message}\n{ex.StackTrace}");
+                Console.WriteLine($"[Accept] EXCEPTION on attempt {attempt}: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                 await tx.RollbackAsync();
-                throw;
+                // Don't rethrow — return a clean error tuple so Flutter always
+                // receives a 400 response and can reset the Accept button.
+                // Rethrowing causes an unhandled 500 which bypasses Flutter's
+                // setState(() => _accepting = false) and locks the button forever.
+                return (null, $"Server error: {ex.Message}");
             }
         }
 
@@ -228,24 +309,39 @@ public class ShipmentQueueService
         if (entry.CurrentOfferedShipmentQueueId != queueItemId)
             return (false, "That shipment is not your current offer.");
 
-        if (entry.OfferStatus != DriverOfferStatus.Pending)
+        // Allow passing from Pending (active window) or Expired (Still Claimable).
+        // Drivers in the expired state can still see the card and may choose to pass.
+        if (entry.OfferStatus != DriverOfferStatus.Pending
+         && entry.OfferStatus != DriverOfferStatus.Expired)
             return (false, $"Offer already resolved (status: {entry.OfferStatus}).");
 
-        // Mark the assignment as passed
+        // Mark the assignment as passed.
+        // When passing from Expired status the worker has already set the assignment
+        // outcome to Expired — in that case we don't need another record, just clear
+        // the driver entry below.  When passing from Pending we flip it to Passed.
         var assignment = await _db.ShipmentQueueAssignments
             .FirstOrDefaultAsync(a => a.QueueEventId    == activeEvent.Id
                                    && a.ShipmentQueueId == queueItemId
                                    && a.DriverId        == driverId
-                                   && a.Outcome         == AssignmentOutcome.Pending);
-        if (assignment != null)
+                                   && (a.Outcome == AssignmentOutcome.Pending
+                                    || a.Outcome == AssignmentOutcome.Expired));
+        if (assignment != null && assignment.Outcome == AssignmentOutcome.Pending)
         {
             assignment.Outcome = AssignmentOutcome.Passed;
             await _db.SaveChangesAsync();
         }
 
-        // Revert shipment to waiting so it can be re-offered
+        // Only revert the shipment to Waiting if no other driver still holds a
+        // live Pending assignment on it.  With parallel offers another driver may
+        // still be in their active window — reverting would pull the rug out from
+        // their offer card.
+        var otherPending = await _db.ShipmentQueueAssignments
+            .AnyAsync(a => a.ShipmentQueueId == queueItemId
+                        && a.DriverId        != driverId
+                        && a.Outcome         == AssignmentOutcome.Pending);
+
         var shipment = await _db.ShipmentQueues.FindAsync(queueItemId);
-        if (shipment != null)
+        if (shipment != null && !otherPending)
         {
             shipment.Status          = ShipmentQueueStatus.Waiting;
             shipment.CurrentDriverId = null;
