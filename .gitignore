@@ -6,7 +6,35 @@
 *.swp
 .buildlog/
 .history
+# .NET Build Outputs
+bin/
+obj/
 
+# Build artifact files
+*.dll
+*.exe
+*.pdb
+*.cache
+
+# NuGet
+*.nuget.dgspec.json
+*.nuget.g.props
+*.nuget.g.targets
+project.assets.json
+project.nuget.cache
+packages/
+*.nupkg
+
+# MSBuild / Compiler generated
+*.AssemblyInfo.cs
+*.AssemblyInfoInputs.cache
+*.assets.cache
+*.AssemblyReference.cache
+*.CoreCompileInputs.cache
+*.FileListAbsolute.txt
+*.GeneratedMSBuildEditorConfig.editorconfig
+*.genruntimeconfig.cache
+apphost.exe
 
 
 # Flutter repo-specific
