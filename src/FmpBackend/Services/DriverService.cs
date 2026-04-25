@@ -152,7 +152,7 @@ public class DriverService
     public void SaveBasicDetails(DriverBasicDetailsDto dto)
     {
         // 1. User must exist
-        var user = _users.GetByPhone(dto.Phone);
+        var user = _users.GetByEmail(dto.Phone);
         if (user == null)
             throw new Exception("User not found");
 

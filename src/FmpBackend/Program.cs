@@ -7,8 +7,9 @@ using FmpBackend.Repositories;
 using FmpBackend.Services;
 using FmpBackend.Workers;
 using FmpBackend.Middleware;
+using System.Text.Json.Serialization;
 
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+//AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,17 +33,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-
-// SignalR for real-time queue updates
 builder.Services.AddSignalR();
 
-// Controllers with camelCase JSON
+// ── Single AddControllers call with camelCase JSON ────────────────────────────
 builder.Services.AddControllers()
-    .AddJsonOptions(opts =>
-        opts.JsonSerializerOptions.PropertyNamingPolicy =
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.PropertyNamingPolicy =
             System.Text.Json.JsonNamingPolicy.CamelCase);
 
-// CORS — allow Flutter app origin
+// ── CORS ──────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
     options.AddPolicy("AllowFlutter", policy =>
         policy.SetIsOriginAllowed(_ => true)
@@ -52,7 +51,7 @@ builder.Services.AddCors(options =>
 
 // ── Dependency Injection ──────────────────────────────────────────────────────
 builder.Services.AddScoped<OtpService>();
-builder.Services.AddScoped<GoogleAuthService>();          // ← NEW
+builder.Services.AddScoped<GoogleAuthService>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<DriverService>();
 builder.Services.AddScoped<DriverRepository>();
@@ -78,6 +77,8 @@ builder.Services.AddScoped<SystemLogService>();
 builder.Services.AddScoped<SysAdminService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddHostedService<QueueMaintenanceWorker>();
+
+// ── NO second AddControllers() here ──────────────────────────────────────────
 
 var app = builder.Build();
 

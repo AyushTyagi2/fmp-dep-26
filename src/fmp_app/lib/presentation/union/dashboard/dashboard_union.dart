@@ -3,11 +3,12 @@ import '../union_queue/queue.dart';
 import '../union_request/request.dart';
 import '../union_profile/profile.dart';
 import '../union_home/home.dart';
-import '../search/union_search_screen.dart';
+import '../queue_events/queue_events_screen.dart';
 import '../../../shared/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UNION DASHBOARD — Logic unchanged, premium UI applied
+// UNION DASHBOARD
+// Tabs: Home | Queue | Events | Requests | Profile | Search
 // ─────────────────────────────────────────────────────────────────────────────
 
 class UnionDashboardScreen extends StatefulWidget {
@@ -25,17 +26,18 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
   late final _pages = [
     const UnionHomeScreen(),
     QueueScreen(driverId: widget.driverId),
+    const QueueEventsScreen(),          // ← new Events tab
     const UnionRequestScreen(),
     const UnionProfileScreen(),
-    const UnionSearchScreen(),
   ];
 
   static const _items = [
-    (Icons.home_rounded,    Icons.home_outlined,            'Home'),
-    (Icons.inbox_rounded,   Icons.inbox_outlined,           'Queue'),
-    (Icons.folder_rounded,  Icons.folder_outlined,          'Requests'),
-    (Icons.person_rounded,  Icons.person_outline_rounded,   'Profile'),
-    (Icons.search_rounded,  Icons.search_outlined,          'Search'),
+    (Icons.home_rounded,       Icons.home_outlined,          'Home'),
+    (Icons.inbox_rounded,      Icons.inbox_outlined,         'Queue'),
+    (Icons.event_note_rounded, Icons.event_note_outlined,    'Events'),
+    (Icons.folder_rounded,     Icons.folder_outlined,        'Requests'),
+    (Icons.person_rounded,     Icons.person_outline_rounded, 'Profile'),
+    
   ];
 
   @override
@@ -44,8 +46,8 @@ class _UnionDashboardScreenState extends State<UnionDashboardScreen> {
       body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: _BottomNav(
         currentIndex: _index,
-        items: _items,
-        onTap: (i) => setState(() => _index = i),
+        items       : _items,
+        onTap       : (i) => setState(() => _index = i),
       ),
     );
   }
@@ -68,45 +70,44 @@ class _BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: const Border(top: BorderSide(color: AppColors.border)),
+        color    : AppColors.surface,
+        border   : const Border(top: BorderSide(color: AppColors.border)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color     : Colors.black.withOpacity(0.06),
             blurRadius: 16,
-            offset: const Offset(0, -4),
+            offset    : const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
-        top: false,
+        top  : false,
         child: SizedBox(
           height: 64,
-          child: Row(
+          child : Row(
             children: List.generate(items.length, (i) {
               final (activeIcon, icon, label) = items[i];
               final active = i == currentIndex;
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => onTap(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
+                  onTap    : () => onTap(i),
+                  behavior : HitTestBehavior.opaque,
+                  child    : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
+                        duration  : const Duration(milliseconds: 200),
+                        padding   : const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 4),
                         decoration: BoxDecoration(
-                          color: active
+                          color       : active
                               ? AppColors.primaryLight
                               : Colors.transparent,
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.pill),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                         ),
                         child: Icon(
                           active ? activeIcon : icon,
-                          size: 22,
+                          size : 22,
                           color: active
                               ? AppColors.primary
                               : AppColors.textHint,
@@ -116,11 +117,11 @@ class _BottomNav extends StatelessWidget {
                       Text(
                         label,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize  : 10,
                           fontWeight: active
                               ? FontWeight.w600
                               : FontWeight.w400,
-                          color: active
+                          color     : active
                               ? AppColors.primary
                               : AppColors.textHint,
                         ),

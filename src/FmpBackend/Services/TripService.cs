@@ -121,17 +121,19 @@ public class TripService
 
             // Also reset any accepted DriverQueueEntry for the driver so they
             // appear as "idle" again on the queue screen instead of "accepted".
+            // Find any accepted DriverQueueEntry for this driver and reset it
+            // so they appear as idle again on the queue screen.
             var staleEntry = await _db.DriverQueueEntries
-                .Where(e => e.DriverId     == trip.DriverId
-                         && e.OfferStatus  == DriverOfferStatus.Accepted)
+                .Where(e => e.DriverId   == trip.DriverId
+                         && e.HasClaimed == true)
                 .OrderByDescending(e => e.ClaimWindowStart)
                 .FirstOrDefaultAsync();
 
             if (staleEntry != null)
             {
-                staleEntry.OfferStatus  = DriverOfferStatus.Idle;
-                staleEntry.HasClaimed   = false;
-                staleEntry.CurrentOfferedShipmentQueueId = null;
+                staleEntry.HasClaimed      = false;
+                staleEntry.ClaimableCount  = 0;
+                staleEntry.ShipmentListJson = "[]";
                 await _db.SaveChangesAsync();
             }
         }

@@ -37,14 +37,12 @@ public class ShipmentQueueController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
-    // POST /api/shipment-queue/{id}/accept
     [HttpPost("{id:guid}/accept")]
     public async Task<IActionResult> Accept(Guid id, [FromBody] AcceptQueueItemRequest req)
     {
         var (tripId, error) = await _svc.AcceptAsync(id, req.DriverId);
         if (error != null)
         {
-            // 409 Conflict for race-loss so Flutter can flip to grey "Taken" card
             if (error.Contains("already accepted") || error.Contains("already claimed"))
                 return Conflict(new AcceptQueueItemResponse(false, null, error));
             return BadRequest(new AcceptQueueItemResponse(false, null, error));
@@ -52,18 +50,13 @@ public class ShipmentQueueController : ControllerBase
         return Ok(new AcceptQueueItemResponse(true, tripId, null));
     }
 
-    // POST /api/shipment-queue/{id}/pass
     [HttpPost("{id:guid}/pass")]
     public async Task<IActionResult> Pass(Guid id, [FromBody] PassQueueItemRequest req)
     {
         var (success, error) = await _svc.PassAsync(id, req.DriverId);
-
         if (!success)
             return Conflict(new PassOfferResponse(false, error, null));
 
-        // Return the driver's updated slot inline so Flutter can skip the
-        // "Waiting for offer" spinner — if a shipment was immediately matched
-        // the slot will already carry the new currentOffer.
         var nextSlot = await _queueEventSvc.GetActiveEventForDriverAsync(req.DriverId);
         return Ok(new PassOfferResponse(true, "Shipment passed.", nextSlot));
     }
@@ -71,4 +64,5 @@ public class ShipmentQueueController : ControllerBase
 
 public record EnqueueRequest(Guid ShipmentId, string? RequiredVehicleType, Guid? ZoneId);
 public record PassQueueItemRequest(Guid DriverId);
-public record PassOfferResponse(bool Success, string Message, object? NextSlot);
+// PassOfferResponse is defined in Dtos/QueueEventDto.cs (NextSlot: ActiveEventDto?)
+// Do NOT redeclare it here — a local record shadows the Dto one and breaks serialisation.

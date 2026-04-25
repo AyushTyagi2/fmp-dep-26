@@ -15,11 +15,21 @@ public class QueueEventsController : ControllerBase
         _service = service;
     }
 
-    // POST /api/queue-events
+    // GET /api/queue-events  — list all events, newest first
+    [HttpGet]
+    public async Task<IActionResult> GetAllEvents()
+    {
+        var result = await _service.GetAllEventsAsync();
+        return Ok(result);
+    }
+
+    // POST /api/queue-events  — create a new event
     [HttpPost]
     public async Task<IActionResult> CreateQueueEvent([FromBody] CreateQueueEventRequest request)
     {
-        var result = await _service.CreateQueueEventAsync(request);
+        var (result, conflict) = await _service.CreateQueueEventAsync(request);
+        if (conflict != null)
+            return Conflict(new { message = conflict });
         return Ok(result);
     }
 

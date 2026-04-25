@@ -3,6 +3,7 @@ using FmpBackend.Repositories;
 using FmpBackend.Models;
 using FmpBackend.Dtos;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace FmpBackend.Services;
 
@@ -12,6 +13,9 @@ public class QueueEventService
     private readonly DriverEligibleRepository   _driverRepo;
     private readonly DriverQueueRepository      _driverQueueRepo;
     private readonly AppDbContext               _db;
+
+    private static readonly JsonSerializerOptions _json =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public QueueEventService(
         QueueEventRepository     queueEventRepo,
@@ -25,446 +29,468 @@ public class QueueEventService
         _db              = db;
     }
 
-    // ─── Create event ────────────────────────────────────────────────────────
+    // ─── Create event ─────────────────────────────────────────────────────────
 
-    public async Task<QueueEvent> CreateQueueEventAsync(CreateQueueEventRequest request)
+    public async Task<(QueueEvent? Event, string? ConflictMessage)> CreateQueueEventAsync(CreateQueueEventRequest request)
     {
         var existing = await _queueEventRepo.GetActiveEventAsync();
         if (existing != null)
-            throw new Exception("A queue event is already active.");
+            return (null, "A queue event is already active.");
 
         var startTime = DateTime.UtcNow;
-        var endTime   = startTime.AddHours(request.DurationHours);
-
         var queueEvent = new QueueEvent
         {
             Id            = Guid.NewGuid(),
             ZoneId        = request.ZoneId,
             StartTime     = startTime,
-            EndTime       = endTime,
+            EndTime       = startTime.AddHours(request.DurationHours),
             WindowSeconds = request.WindowSeconds,
             Status        = QueueEventStatus.Live
         };
-
         await _queueEventRepo.CreateAsync(queueEvent);
 
-        // Build driver queue first (position assignment, no sequential windows)
+        // 1. Assign positions to all eligible drivers
         await GenerateDriverQueue(queueEvent);
 
-        // Then pair drivers ↔ shipments in parallel
-        await AssignOffersAsync(queueEvent);
+        // 2. Build each driver's initial shipment list and open first windows
+        await BuildDriverListsAsync(queueEvent);
 
-        return queueEvent;
+        return (queueEvent, null);
     }
 
-    // ─── Step 1: Build the driver queue (positions only) ────────────────────
+    // ─── Step 1: Assign positions ─────────────────────────────────────────────
 
     private async Task GenerateDriverQueue(QueueEvent queueEvent)
     {
         var drivers = await _driverRepo.GetEligibleDriversAsync();
         var now     = DateTime.UtcNow;
 
-        var entries = drivers.Select((driver, index) => new DriverQueueEntry
+        var entries = drivers.Select((driver, i) => new DriverQueueEntry
         {
             Id               = Guid.NewGuid(),
             QueueEventId     = queueEvent.Id,
             DriverId         = driver.Id,
-            Position         = index + 1,
-            // Window spans the entire event duration — drivers are offered one
-            // shipment at a time, so the window just guards overall event membership
+            Position         = i + 1,
             ClaimWindowStart = now,
             ClaimWindowEnd   = queueEvent.EndTime,
             HasClaimed       = false,
-            OfferStatus      = DriverOfferStatus.Idle
+            ShipmentListJson = "[]",
+            ClaimableCount   = 0
         }).ToList();
 
         await _driverQueueRepo.AddEntriesAsync(entries);
     }
 
-    // ─── Step 2: Pair drivers ↔ shipments (parallel sliding window) ─────────
+    // ─── Step 2: Build / rebuild every driver's shipment list ────────────────
+    //
+    // Called on:  event start, new shipment enqueued, re-open event.
+    // NOT called on: window expiry, accept, pass — those use targeted mutations.
+    //
+    // Algorithm:
+    //   Fetch all unaccepted shipments ordered by CreatedAt.
+    //   For each driver, build their slot array from those shipments.
+    //   Preserve any existing per-slot state (IsExpired, IsSkipped, ExpiresAt)
+    //   that was set by a previous mutation — merge rather than reset.
+    //   Set ClaimableCount = 1 for position-1 driver (their first window is live),
+    //   0 for everyone else unless they already had a higher count.
 
-    /// <summary>
-    /// Core matching algorithm:
-    ///   Sort unclaimed shipments by CreatedAt (oldest first).
-    ///   Sort available drivers by Position.
-    ///   Pair them N:N simultaneously.
-    ///   Create a ShipmentQueueAssignment per pair and set window timers.
-    /// 
-    /// Called on event start AND whenever a new shipment enters the queue
-    /// mid-event (to pick up any driver that currently has no offer).
-    /// </summary>
-    public async Task AssignOffersAsync(QueueEvent queueEvent)
+    public async Task BuildDriverListsAsync(QueueEvent queueEvent)
     {
-        Console.WriteLine($"[AssignOffers] ── START eventId={queueEvent.Id}");
+        Console.WriteLine($"[BuildLists] START eventId={queueEvent.Id}");
 
-        // Drivers without a current pending offer, ordered by position.
-        // Exclude Expired drivers who still hold a CurrentOfferedShipmentQueueId —
-        // their offer card is still showing ("Still Claimable") and they should NOT
-        // be re-matched to a new shipment until they pass, accept, or someone else
-        // accepts the same shipment (which clears their entry via the accept path).
-        var idleDriverEntries = await _db.DriverQueueEntries
-            .Where(e => e.QueueEventId == queueEvent.Id
-                     && !e.HasClaimed
-                     && (e.OfferStatus == DriverOfferStatus.Idle
-                      || e.OfferStatus == DriverOfferStatus.Passed
-                      || (e.OfferStatus == DriverOfferStatus.Expired
-                          && e.CurrentOfferedShipmentQueueId == null)))
+        var shipments = await GetActiveShipmentsAsync(queueEvent);
+        if (!shipments.Any())
+        {
+            Console.WriteLine("[BuildLists] no shipments → nothing to do");
+            return;
+        }
+
+        var entries = await _db.DriverQueueEntries
+            .Where(e => e.QueueEventId == queueEvent.Id && !e.HasClaimed)
             .OrderBy(e => e.Position)
             .ToListAsync();
 
-        Console.WriteLine($"[AssignOffers] idleDriverEntries count={idleDriverEntries.Count}");
-        foreach (var d in idleDriverEntries)
-            Console.WriteLine($"[AssignOffers]   driver pos={d.Position} id={d.DriverId} status={d.OfferStatus} currentOfferedId={d.CurrentOfferedShipmentQueueId?.ToString() ?? "NULL"}");
+        if (!entries.Any()) { Console.WriteLine("[BuildLists] no entries"); return; }
 
-        if (!idleDriverEntries.Any())
+        var now = DateTime.UtcNow;
+
+        foreach (var entry in entries)
         {
-            Console.WriteLine("[AssignOffers] No idle drivers → returning early");
-            return;
-        }
+            // Deserialise existing slot state so we can preserve mutations
+            var existingSlots = DeserialiseSlots(entry.ShipmentListJson)
+                .ToDictionary(s => s.ShipmentQueueId);
 
-        // Shipments not yet in a pending assignment for this event
-        var pendingShipmentIds = await _db.ShipmentQueueAssignments
-            .Where(a => a.QueueEventId == queueEvent.Id && a.Outcome == AssignmentOutcome.Pending)
-            .Select(a => a.ShipmentQueueId)
-            .ToListAsync();
-
-        // Include both Waiting AND Offered shipments.
-        // The pendingShipmentIds exclusion (built from the assignments table) is the
-        // real guard against duplicate assignments: a shipment already assigned to
-        // *this* driver in a Pending assignment will be in pendingShipmentIds and is
-        // excluded, but a shipment currently Offered to a *different* driver is still
-        // eligible so that idle driver #1 is never starved when all shipments happen
-        // to be in the Offered state (e.g. assigned to drivers 2, 3, 4 in a prior pass).
-        var availableShipments = await _db.ShipmentQueues
-            .Where(s => (s.Status == ShipmentQueueStatus.Waiting
-                      || s.Status == ShipmentQueueStatus.Offered)
-                     && !pendingShipmentIds.Contains(s.Id)
-                     && (s.ZoneId == null || s.ZoneId == queueEvent.ZoneId))
-            .OrderBy(s => s.CreatedAt)
-            .ToListAsync();
-
-        Console.WriteLine($"[AssignOffers] pendingShipmentIds (already assigned)={string.Join(",", pendingShipmentIds)}");
-        Console.WriteLine($"[AssignOffers] availableShipments count={availableShipments.Count}");
-        foreach (var s in availableShipments)
-            Console.WriteLine($"[AssignOffers]   shipment id={s.Id} status={s.Status} currentDriverId={s.CurrentDriverId?.ToString() ?? "NULL"} expiresAt={s.OfferExpiresAt?.ToString("O") ?? "NULL"}");
-
-        if (!availableShipments.Any())
-        {
-            Console.WriteLine("[AssignOffers] No available shipments → returning early");
-            return;
-        }
-
-        // Build a lookup of (driverId, shipmentQueueId) pairs that have already
-        // been offered and rejected/expired.  A shipment cascades to the next
-        // driver in position order, but if EVERY eligible driver has already
-        // passed/expired on a shipment it gets re-circulated from the top so
-        // it is never permanently stuck.
-        var allHistory = await _db.ShipmentQueueAssignments
-            .Where(a => a.QueueEventId == queueEvent.Id
-                     && (a.Outcome == AssignmentOutcome.Passed
-                      || a.Outcome == AssignmentOutcome.Expired))
-            .Select(a => new { a.DriverId, a.ShipmentQueueId })
-            .ToListAsync();
-
-        // Per-shipment: set of driver IDs that have already rejected it
-        var rejectedByShipment = allHistory
-            .GroupBy(p => p.ShipmentQueueId)
-            .ToDictionary(g => g.Key, g => g.Select(p => p.DriverId).ToHashSet());
-
-        // All eligible (non-claimed) driver IDs in this event
-        var allEligibleDriverIds = await _db.DriverQueueEntries
-            .Where(e => e.QueueEventId == queueEvent.Id && !e.HasClaimed)
-            .Select(e => e.DriverId)
-            .ToListAsync();
-
-        // A shipment is "exhausted" only if every eligible driver has already
-        // passed/expired on it — in that case, reset its rejection history so
-        // it re-circulates from the top of the queue.
-        var exhaustedShipmentIds = rejectedByShipment
-            .Where(kv => allEligibleDriverIds.All(id => kv.Value.Contains(id)))
-            .Select(kv => kv.Key)
-            .ToHashSet();
-
-        // For exhausted shipments, clear their history so they are re-offerable
-        if (exhaustedShipmentIds.Any())
-        {
-            var staleRecords = await _db.ShipmentQueueAssignments
-                .Where(a => a.QueueEventId == queueEvent.Id
-                         && exhaustedShipmentIds.Contains(a.ShipmentQueueId)
-                         && (a.Outcome == AssignmentOutcome.Passed
-                          || a.Outcome == AssignmentOutcome.Expired))
-                .ToListAsync();
-            _db.ShipmentQueueAssignments.RemoveRange(staleRecords);
-            await _db.SaveChangesAsync();
-
-            // Rebuild without the exhausted entries
-            allHistory = allHistory
-                .Where(p => !exhaustedShipmentIds.Contains(p.ShipmentQueueId))
-                .ToList();
-            foreach (var id in exhaustedShipmentIds)
-                rejectedByShipment.Remove(id);
-        }
-
-        var seenSet = allHistory
-            .Select(p => (p.DriverId, p.ShipmentQueueId))
-            .ToHashSet();
-
-        var now        = DateTime.UtcNow;
-        var expiresAt  = now.AddSeconds(queueEvent.WindowSeconds);
-        var newAssignments = new List<ShipmentQueueAssignment>();
-
-        // Track which shipments have been matched in this pass so we don't
-        // double-assign the same shipment to two drivers.
-        var matchedShipmentIds = new HashSet<Guid>();
-
-        foreach (var entry in idleDriverEntries)
-        {
-            // Find the oldest waiting shipment this driver hasn't already
-            // passed on or let expire.
-            var shipment = availableShipments.FirstOrDefault(s =>
-                !matchedShipmentIds.Contains(s.Id) &&
-                !seenSet.Contains((entry.DriverId, s.Id)));
-
-            // ── Per-driver exhaustion fallback ────────────────────────────────
-            // If this driver has already seen every available shipment (all blocked
-            // by seenSet), re-offer the oldest one that isn't already matched this
-            // pass.  This prevents a driver from being permanently stuck when all
-            // shipments have cycled through and none is "new" to them.
-            if (shipment == null)
+            var slots = shipments.Select(sq =>
             {
-                var blockedByMatched = availableShipments.Where(s => matchedShipmentIds.Contains(s.Id)).Select(s => s.Id.ToString()).ToList();
-                var blockedBySeen    = availableShipments.Where(s => seenSet.Contains((entry.DriverId, s.Id))).Select(s => s.Id.ToString()).ToList();
-                Console.WriteLine($"[AssignOffers] driver pos={entry.Position} id={entry.DriverId}: no fresh shipment — alreadyMatchedThisPass=[{string.Join(",", blockedByMatched)}] seenByDriver=[{string.Join(",", blockedBySeen)}] totalAvailable={availableShipments.Count}");
+                if (existingSlots.TryGetValue(sq.Id, out var existing))
+                    return existing;   // preserve IsExpired / IsSkipped / ExpiresAt
 
-                // All available shipments have been seen by this driver.
-                // Re-offer the oldest one not already matched this pass.
-                shipment = availableShipments.FirstOrDefault(s => !matchedShipmentIds.Contains(s.Id));
-                if (shipment == null)
+                return new DriverShipmentSlot
                 {
-                    Console.WriteLine($"[AssignOffers] driver pos={entry.Position} id={entry.DriverId}: all shipments matched this pass — skipping");
-                    continue;
-                }
+                    ShipmentQueueId = sq.Id,
+                    ExpiresAt       = null,
+                    IsExpired       = false,
+                    IsSkipped       = false
+                };
+            }).ToList();
 
-                // Clear the stale history records for this driver+shipment pair so
-                // the new assignment isn't immediately blocked by the old seenSet.
-                var staleForDriver = await _db.ShipmentQueueAssignments
-                    .Where(a => a.QueueEventId    == queueEvent.Id
-                             && a.DriverId        == entry.DriverId
-                             && a.ShipmentQueueId == shipment.Id
-                             && (a.Outcome == AssignmentOutcome.Passed
-                              || a.Outcome == AssignmentOutcome.Expired))
-                    .ToListAsync();
-                if (staleForDriver.Any())
-                {
-                    _db.ShipmentQueueAssignments.RemoveRange(staleForDriver);
-                    await _db.SaveChangesAsync();
-                    Console.WriteLine($"[AssignOffers] driver pos={entry.Position} id={entry.DriverId}: cleared {staleForDriver.Count} stale history records for shipment={shipment.Id} — re-offering");
-                }
+            // For position-1 driver: if count is still 0, open first window
+            if (entry.Position == 1 && entry.ClaimableCount == 0 && slots.Any())
+            {
+                var firstActive = slots.First(s => !s.IsSkipped && !s.IsExpired);
+                firstActive.ExpiresAt = now.AddSeconds(queueEvent.WindowSeconds);
+                entry.ClaimableCount  = 1;
+
+                // Create the first assignment record so the worker can fire on expiry
+                await CreateAssignmentAsync(queueEvent, entry, firstActive);
             }
-            Console.WriteLine($"[AssignOffers] driver pos={entry.Position} id={entry.DriverId}: MATCHED shipment={shipment.Id} status={shipment.Status}");
 
-            matchedShipmentIds.Add(shipment.Id);
-
-            // Mark the driver as having a pending offer
-            entry.CurrentOfferedShipmentQueueId = shipment.Id;
-            entry.OfferStatus                   = DriverOfferStatus.Pending;
-
-            // Mark the shipment as offered
-            shipment.Status          = ShipmentQueueStatus.Offered;
-            shipment.CurrentDriverId = entry.DriverId;
-            shipment.OfferExpiresAt  = expiresAt;
-
-            newAssignments.Add(new ShipmentQueueAssignment
-            {
-                Id              = Guid.NewGuid(),
-                QueueEventId    = queueEvent.Id,
-                ShipmentQueueId = shipment.Id,
-                DriverId        = entry.DriverId,
-                DriverPosition  = entry.Position,
-                OfferedAt       = now,
-                ExpiresAt       = expiresAt,
-                Outcome         = AssignmentOutcome.Pending
-            });
+            entry.ShipmentListJson = SerialiseSlots(slots);
+            Console.WriteLine($"[BuildLists] driver pos={entry.Position} slots={slots.Count} claimable={entry.ClaimableCount}");
         }
 
-        if (newAssignments.Any())
-        {
-            _db.ShipmentQueueAssignments.AddRange(newAssignments);
-            await _db.SaveChangesAsync();
-        }
+        await _db.SaveChangesAsync();
+        Console.WriteLine("[BuildLists] END");
     }
 
-    // ─── GET active event slot for a driver ──────────────────────────────────
+    // ─── Window expired: called by worker ────────────────────────────────────
+    //
+    // The worker found a ShipmentQueueAssignment with Outcome=Pending, ExpiresAt<now.
+    // It calls this to perform the state mutation on both affected driver entries.
+
+    public async Task OnWindowExpiredAsync(ShipmentQueueAssignment assignment)
+    {
+        Console.WriteLine($"[OnWindowExpired] assignmentId={assignment.Id} driver={assignment.DriverId} shipment={assignment.ShipmentQueueId}");
+
+        var activeEvent = await _db.QueueEvents.FindAsync(assignment.QueueEventId);
+        if (activeEvent == null) return;
+
+        var shipments = await GetActiveShipmentsAsync(activeEvent);
+
+        // ── 1. Update the driver whose window just expired ───────────────────
+        var entry = await _db.DriverQueueEntries
+            .FirstOrDefaultAsync(e => e.QueueEventId == assignment.QueueEventId
+                                   && e.DriverId     == assignment.DriverId);
+        if (entry == null) return;
+
+        var slots = DeserialiseSlots(entry.ShipmentListJson);
+        var expiredSlot = slots.FirstOrDefault(s => s.ShipmentQueueId == assignment.ShipmentQueueId);
+        if (expiredSlot != null)
+        {
+            expiredSlot.IsExpired = true;
+            expiredSlot.ExpiresAt = null;   // countdown gone, amber card
+        }
+
+        // Open the next unclaimable, un-skipped shipment for this driver
+        var nextSlot = slots
+            .Skip(entry.ClaimableCount)
+            .FirstOrDefault(s => !s.IsSkipped);
+
+        if (nextSlot != null)
+        {
+            nextSlot.ExpiresAt    = DateTime.UtcNow.AddSeconds(activeEvent.WindowSeconds);
+            entry.ClaimableCount += 1;
+            await CreateAssignmentAsync(activeEvent, entry, nextSlot);
+        }
+
+        entry.ShipmentListJson = SerialiseSlots(slots);
+
+        // ── 2. Open the same shipment for the NEXT driver in position order ──
+        var nextEntry = await _db.DriverQueueEntries
+            .Where(e => e.QueueEventId == assignment.QueueEventId
+                     && !e.HasClaimed
+                     && e.Position     == entry.Position + 1)
+            .FirstOrDefaultAsync();
+
+        if (nextEntry != null)
+        {
+            var nextDriverSlots = DeserialiseSlots(nextEntry.ShipmentListJson);
+
+            // Add the expired shipment to their list if not already there
+            var targetSlot = nextDriverSlots.FirstOrDefault(s => s.ShipmentQueueId == assignment.ShipmentQueueId);
+            if (targetSlot == null)
+            {
+                // Slot not in list yet — insert at correct position
+                targetSlot = new DriverShipmentSlot { ShipmentQueueId = assignment.ShipmentQueueId };
+                var insertIdx = shipments.FindIndex(s => s.Id == assignment.ShipmentQueueId);
+                if (insertIdx >= 0 && insertIdx <= nextDriverSlots.Count)
+                    nextDriverSlots.Insert(insertIdx, targetSlot);
+                else
+                    nextDriverSlots.Add(targetSlot);
+            }
+
+            // It becomes the NEW active window for nextEntry
+            targetSlot.ExpiresAt  = DateTime.UtcNow.AddSeconds(activeEvent.WindowSeconds);
+            targetSlot.IsExpired  = false;
+
+            // ClaimableCount for next driver: the expired shipment's index + 1
+            var slotIdx = nextDriverSlots.IndexOf(targetSlot);
+            if (nextEntry.ClaimableCount <= slotIdx)
+                nextEntry.ClaimableCount = slotIdx + 1;
+
+            nextEntry.ShipmentListJson = SerialiseSlots(nextDriverSlots);
+            await CreateAssignmentAsync(activeEvent, nextEntry, targetSlot);
+
+            Console.WriteLine($"[OnWindowExpired] opened window for nextDriver pos={nextEntry.Position} shipment={assignment.ShipmentQueueId}");
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
+    // ─── Shipment accepted: remove from all lists ─────────────────────────────
+
+    public async Task OnShipmentAcceptedAsync(Guid queueEventId, Guid acceptedShipmentQueueId)
+    {
+        Console.WriteLine($"[OnAccepted] removing shipment={acceptedShipmentQueueId} from all lists");
+
+        var entries = await _db.DriverQueueEntries
+            .Where(e => e.QueueEventId == queueEventId && !e.HasClaimed)
+            .ToListAsync();
+
+        foreach (var entry in entries)
+        {
+            var slots = DeserialiseSlots(entry.ShipmentListJson);
+            var removedIdx = slots.FindIndex(s => s.ShipmentQueueId == acceptedShipmentQueueId);
+            if (removedIdx < 0) continue;
+
+            // Was this shipment within the claimable range?
+            var wasClaimable = removedIdx < entry.ClaimableCount;
+            slots.RemoveAt(removedIdx);
+
+            if (wasClaimable)
+            {
+                // Decrement count since we removed a claimable item
+                entry.ClaimableCount = Math.Max(0, entry.ClaimableCount - 1);
+
+                // If count dropped to 0 and there are still shipments, open first window
+                if (entry.ClaimableCount == 0 && slots.Any(s => !s.IsSkipped))
+                {
+                    var activeEvent = await _db.QueueEvents.FindAsync(queueEventId);
+                    if (activeEvent != null)
+                    {
+                        var firstAvailable = slots.First(s => !s.IsSkipped);
+                        firstAvailable.ExpiresAt = DateTime.UtcNow.AddSeconds(activeEvent.WindowSeconds);
+                        entry.ClaimableCount     = 1;
+                        await CreateAssignmentAsync(activeEvent, entry, firstAvailable);
+                    }
+                }
+            }
+
+            entry.ShipmentListJson = SerialiseSlots(slots);
+        }
+
+        await _db.SaveChangesAsync();
+        Console.WriteLine($"[OnAccepted] done — updated {entries.Count} driver lists");
+    }
+
+    // ─── Driver passed a shipment ─────────────────────────────────────────────
+
+    public async Task OnDriverPassedAsync(Guid queueEventId, Guid driverId, Guid passedShipmentQueueId)
+    {
+        Console.WriteLine($"[OnPassed] driver={driverId} passed shipment={passedShipmentQueueId}");
+
+        var activeEvent = await _db.QueueEvents.FindAsync(queueEventId);
+        if (activeEvent == null) return;
+
+        // ── 1. Mark as skipped in driver's own list ─────────────────────────
+        var entry = await _db.DriverQueueEntries
+            .FirstOrDefaultAsync(e => e.QueueEventId == queueEventId && e.DriverId == driverId);
+        if (entry == null) return;
+
+        var slots    = DeserialiseSlots(entry.ShipmentListJson);
+        var passedSlot = slots.FirstOrDefault(s => s.ShipmentQueueId == passedShipmentQueueId);
+        if (passedSlot == null) return;
+
+        var passedIdx = slots.IndexOf(passedSlot);
+
+        // Cancel the running assignment timer for this slot
+        var runningAssignment = await _db.ShipmentQueueAssignments
+            .FirstOrDefaultAsync(a => a.QueueEventId    == queueEventId
+                                   && a.DriverId        == driverId
+                                   && a.ShipmentQueueId == passedShipmentQueueId
+                                   && a.Outcome         == AssignmentOutcome.Pending);
+        if (runningAssignment != null)
+            runningAssignment.Outcome = AssignmentOutcome.Passed;
+
+        passedSlot.IsSkipped  = true;
+        passedSlot.ExpiresAt  = null;
+
+        // If the passed slot was the active window (last in claimable range, not expired),
+        // open the NEXT un-skipped, un-claimable slot for this driver immediately.
+        var wasActiveWindow = passedIdx == entry.ClaimableCount - 1 && !passedSlot.IsExpired;
+        if (wasActiveWindow)
+        {
+            var nextSlot = slots
+                .Skip(entry.ClaimableCount)
+                .FirstOrDefault(s => !s.IsSkipped);
+            if (nextSlot != null)
+            {
+                nextSlot.ExpiresAt    = DateTime.UtcNow.AddSeconds(activeEvent.WindowSeconds);
+                entry.ClaimableCount += 1;
+                await CreateAssignmentAsync(activeEvent, entry, nextSlot);
+            }
+        }
+
+        entry.ShipmentListJson = SerialiseSlots(slots);
+
+        // ── 2. Immediately open passed shipment for the next driver in cascade ──
+        // Find the next driver who doesn't yet have this shipment in their claimable range.
+        var nextEntry = await _db.DriverQueueEntries
+            .Where(e => e.QueueEventId == queueEventId
+                     && !e.HasClaimed
+                     && e.DriverId    != driverId)
+            .OrderBy(e => e.Position)
+            .ToListAsync();
+
+        foreach (var candidate in nextEntry)
+        {
+            var cSlots = DeserialiseSlots(candidate.ShipmentListJson);
+            var cSlot  = cSlots.FirstOrDefault(s => s.ShipmentQueueId == passedShipmentQueueId);
+
+            if (cSlot == null)
+            {
+                // Not in their list yet — add it
+                cSlot = new DriverShipmentSlot { ShipmentQueueId = passedShipmentQueueId };
+                var insertAt = Math.Min(passedIdx, cSlots.Count);
+                cSlots.Insert(insertAt, cSlot);
+            }
+
+            // Only open if it's not already claimable for them
+            var cIdx = cSlots.IndexOf(cSlot);
+            if (cIdx >= candidate.ClaimableCount)
+            {
+                cSlot.ExpiresAt      = DateTime.UtcNow.AddSeconds(activeEvent.WindowSeconds);
+                cSlot.IsExpired      = false;
+                candidate.ClaimableCount = cIdx + 1;
+                candidate.ShipmentListJson = SerialiseSlots(cSlots);
+                await CreateAssignmentAsync(activeEvent, candidate, cSlot);
+                Console.WriteLine($"[OnPassed] opened passed shipment for next driver pos={candidate.Position}");
+                break;  // only one driver gets the immediate pass cascade
+            }
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
+    // ─── GET active event slot for a driver ───────────────────────────────────
 
     public async Task<ActiveEventDto?> GetActiveEventForDriverAsync(Guid driverId)
     {
-        Console.WriteLine($"[GetActiveSlot] ── START driverId={driverId} utcNow={DateTime.UtcNow:O}");
-
         var activeEvent = await _db.QueueEvents
             .FirstOrDefaultAsync(e => e.Status == QueueEventStatus.Live
                                    && e.EndTime > DateTime.UtcNow);
-
-        if (activeEvent == null)
-        {
-            Console.WriteLine("[GetActiveSlot] No live event found → returning null");
-            return null;
-        }
-        Console.WriteLine($"[GetActiveSlot] Event found: id={activeEvent.Id} endTime={activeEvent.EndTime:O}");
+        if (activeEvent == null) return null;
 
         var entry = await _db.DriverQueueEntries
-            .Include(e => e.CurrentOfferedShipment)
-                .ThenInclude(s => s!.Shipment)
-                    .ThenInclude(s => s.PickupAddress)
-            .Include(e => e.CurrentOfferedShipment)
-                .ThenInclude(s => s!.Shipment)
-                    .ThenInclude(s => s.DropAddress)
             .FirstOrDefaultAsync(e => e.QueueEventId == activeEvent.Id
-                                   && e.DriverId == driverId);
+                                   && e.DriverId     == driverId);
+        if (entry == null) return null;
 
-        if (entry == null)
+        // Self-heal: driver finished their trip, reset so they can rejoin
+        if (entry.HasClaimed)
         {
-            Console.WriteLine("[GetActiveSlot] No DriverQueueEntry found for this driver in the event → returning null");
-            return null;
-        }
-
-        Console.WriteLine($"[GetActiveSlot] Entry loaded: pos={entry.Position} offerStatus={entry.OfferStatus} hasClaimed={entry.HasClaimed} currentOfferedShipmentQueueId={entry.CurrentOfferedShipmentQueueId?.ToString() ?? "NULL"}");
-        Console.WriteLine($"[GetActiveSlot] CurrentOfferedShipment null? {entry.CurrentOfferedShipment == null}");
-        if (entry.CurrentOfferedShipment != null)
-            Console.WriteLine($"[GetActiveSlot]   → shipment status={entry.CurrentOfferedShipment.Status} offerExpiresAt={entry.CurrentOfferedShipment.OfferExpiresAt?.ToString("O") ?? "NULL"} currentDriverId={entry.CurrentOfferedShipment.CurrentDriverId?.ToString() ?? "NULL"}");
-
-        // ── Self-heal: if the entry says "accepted" but the driver has no
-        //    active trip (they finished it), reset to idle so they can
-        //    participate in the queue again without waiting for a restart.
-        if (entry.OfferStatus == DriverOfferStatus.Accepted || entry.HasClaimed)
-        {
-            Console.WriteLine("[GetActiveSlot] SELF-HEAL-1: entry is Accepted/HasClaimed — checking for active trip");
             var hasActiveTrip = await _db.Trips.AnyAsync(t =>
                 t.DriverId == driverId &&
                 TripStatus.ActiveStatuses.Contains(t.CurrentStatus));
 
-            Console.WriteLine($"[GetActiveSlot] SELF-HEAL-1: hasActiveTrip={hasActiveTrip}");
             if (!hasActiveTrip)
             {
-                Console.WriteLine("[GetActiveSlot] SELF-HEAL-1: no active trip → resetting entry to Idle");
-                entry.OfferStatus  = DriverOfferStatus.Idle;
-                entry.HasClaimed   = false;
-                entry.CurrentOfferedShipmentQueueId = null;
+                entry.HasClaimed     = false;
+                entry.ClaimableCount = 0;
+                entry.ShipmentListJson = "[]";
 
                 var driver = await _db.Drivers.FindAsync(driverId);
-                Console.WriteLine($"[GetActiveSlot] SELF-HEAL-1: driver.AvailabilityStatus={driver?.AvailabilityStatus ?? "NULL"}");
-                if (driver != null && driver.AvailabilityStatus == DriverAvailabilityStatus.OnTrip)
-                {
+                if (driver?.AvailabilityStatus == DriverAvailabilityStatus.OnTrip)
                     driver.AvailabilityStatus = DriverAvailabilityStatus.Available;
-                    Console.WriteLine("[GetActiveSlot] SELF-HEAL-1: reset driver → Available");
-                }
 
-                var vehicle = await _db.Vehicles
-                    .FirstOrDefaultAsync(v => v.CurrentDriverId == driverId
-                                           && v.AvailabilityStatus == VehicleStatus.OnTrip);
-                Console.WriteLine($"[GetActiveSlot] SELF-HEAL-1: vehicle found with OnTrip? {vehicle != null}");
+                var vehicle = await _db.Vehicles.FirstOrDefaultAsync(
+                    v => v.CurrentDriverId == driverId && v.AvailabilityStatus == VehicleStatus.OnTrip);
                 if (vehicle != null)
-                {
                     vehicle.AvailabilityStatus = VehicleStatus.Available;
-                    Console.WriteLine("[GetActiveSlot] SELF-HEAL-1: reset vehicle → Available");
-                }
 
                 await _db.SaveChangesAsync();
-                Console.WriteLine("[GetActiveSlot] SELF-HEAL-1: saved — calling AssignOffersAsync");
-                await AssignOffersAsync(activeEvent);
+
+                // Rebuild their list so they get fresh offers
+                await BuildDriverListsAsync(activeEvent);
 
                 entry = await _db.DriverQueueEntries
-                    .Include(e => e.CurrentOfferedShipment)
-                        .ThenInclude(s => s!.Shipment)
-                            .ThenInclude(s => s.PickupAddress)
-                    .Include(e => e.CurrentOfferedShipment)
-                        .ThenInclude(s => s!.Shipment)
-                            .ThenInclude(s => s.DropAddress)
-                    .FirstAsync(e => e.QueueEventId == activeEvent.Id
-                                  && e.DriverId == driverId);
-                Console.WriteLine($"[GetActiveSlot] SELF-HEAL-1: re-fetched entry: offerStatus={entry.OfferStatus} currentOfferedShipmentQueueId={entry.CurrentOfferedShipmentQueueId?.ToString() ?? "NULL"}");
+                    .FirstAsync(e => e.QueueEventId == activeEvent.Id && e.DriverId == driverId);
             }
         }
 
-        // ── Self-heal: if the pending offer has already expired (background
-        //    worker hasn't cleaned it up yet), flip to Expired so the Flutter
-        //    card shows the "Still Claimable" amber state.
-        if (entry.OfferStatus == DriverOfferStatus.Pending
-         && entry.CurrentOfferedShipment?.OfferExpiresAt != null
-         && entry.CurrentOfferedShipment.OfferExpiresAt < DateTime.UtcNow)
+        // Self-heal: if this driver has no shipments yet, trigger BuildDriverListsAsync
+        // ONCE — but only if the driver's list is genuinely empty (not just claimableCount=0,
+        // which is normal for drivers who are waiting their turn).
+        // Guard: check if their JSON list is empty, not just claimableCount, to avoid
+        // calling BuildDriverListsAsync on every poll for every locked driver.
+        var slots = DeserialiseSlots(entry.ShipmentListJson);
+        if (slots.Count == 0 && !entry.HasClaimed)
         {
-            Console.WriteLine($"[GetActiveSlot] SELF-HEAL-2: Pending offer expired (expiresAt={entry.CurrentOfferedShipment.OfferExpiresAt:O}) → flipping to Expired, keeping shipment ref");
-            entry.OfferStatus = DriverOfferStatus.Expired;
-            await _db.SaveChangesAsync();
-            Console.WriteLine("[GetActiveSlot] SELF-HEAL-2: saved");
+            var hasShipments = await _db.ShipmentQueues
+                .AnyAsync(s => (s.Status == ShipmentQueueStatus.Waiting
+                             || s.Status == ShipmentQueueStatus.Offered)
+                            && (s.ZoneId == null || s.ZoneId == activeEvent.ZoneId));
+            if (hasShipments)
+            {
+                await BuildDriverListsAsync(activeEvent);
+                entry = await _db.DriverQueueEntries
+                    .FirstAsync(e => e.QueueEventId == activeEvent.Id && e.DriverId == driverId);
+            }
         }
 
-        // ── Self-heal: driver is idle/passed/expired with no pending offer.
-        if (entry.CurrentOfferedShipmentQueueId == null
-         && (entry.OfferStatus == DriverOfferStatus.Idle
-          || entry.OfferStatus == DriverOfferStatus.Passed
-          || entry.OfferStatus == DriverOfferStatus.Expired)
-         && !entry.HasClaimed)
-        {
-            Console.WriteLine($"[GetActiveSlot] SELF-HEAL-3: driver has no offer (status={entry.OfferStatus}, currentOfferedShipmentQueueId=NULL) → calling AssignOffersAsync");
-            await AssignOffersAsync(activeEvent);
+        return await BuildDtoAsync(activeEvent, entry);
+    }
 
-            entry = await _db.DriverQueueEntries
-                .Include(e => e.CurrentOfferedShipment)
-                    .ThenInclude(s => s!.Shipment)
-                        .ThenInclude(s => s.PickupAddress)
-                .Include(e => e.CurrentOfferedShipment)
-                    .ThenInclude(s => s!.Shipment)
-                        .ThenInclude(s => s.DropAddress)
-                .FirstAsync(e => e.QueueEventId == activeEvent.Id
-                              && e.DriverId == driverId);
-            Console.WriteLine($"[GetActiveSlot] SELF-HEAL-3: re-fetched: offerStatus={entry.OfferStatus} currentOfferedShipmentQueueId={entry.CurrentOfferedShipmentQueueId?.ToString() ?? "NULL"}");
-        }
+    // ─── Helpers ──────────────────────────────────────────────────────────────
 
-        // ── Build currentOffer DTO ───────────────────────────────────────────
-        Console.WriteLine($"[GetActiveSlot] BUILD-OFFER check: currentOfferedShipmentQueueId={entry.CurrentOfferedShipmentQueueId?.ToString() ?? "NULL"} offerStatus={entry.OfferStatus} currentOfferedShipment null?={entry.CurrentOfferedShipment == null}");
+    // BuildDto is async because it needs to await the shipment enrichment query.
+    // The previous version used synchronous .ToDictionary() on an IQueryable which
+    // caused the query to execute on the DbContext without being awaited — returning
+    // empty results silently and causing claimableCount>0 but shipmentSlots=[] on
+    // the Flutter side, which fell through to the "Queue is closed" widget.
+    private async Task<ActiveEventDto> BuildDtoAsync(QueueEvent activeEvent, DriverQueueEntry entry)
+    {
+        var slots = DeserialiseSlots(entry.ShipmentListJson);
 
-        CurrentOfferDto? currentOffer = null;
-        if (entry.CurrentOfferedShipmentQueueId != null
-         && (entry.OfferStatus == DriverOfferStatus.Pending || entry.OfferStatus == DriverOfferStatus.Expired)
-         && entry.CurrentOfferedShipment != null)
-        {
-            var sq = entry.CurrentOfferedShipment;
-            Console.WriteLine($"[GetActiveSlot] BUILD-OFFER: building DTO for shipment={sq.Id} status={sq.Status} expiresAt={sq.OfferExpiresAt?.ToString("O") ?? "NULL"}");
-            currentOffer = new CurrentOfferDto(
-                ShipmentQueueId : sq.Id,
-                ShipmentId      : sq.ShipmentId,
-                ShipmentNumber  : sq.Shipment.ShipmentNumber,
-                PickupLocation  : FormatAddress(sq.Shipment.PickupAddress),
-                DropLocation    : FormatAddress(sq.Shipment.DropAddress),
-                CargoType       : sq.Shipment.CargoType,
-                CargoWeightKg   : sq.Shipment.CargoWeightKg,
-                AgreedPrice     : sq.Shipment.AgreedPrice,
-                IsUrgent        : sq.Shipment.IsUrgent,
-                ExpiresAt       : sq.OfferExpiresAt
-            );
-        }
-        else
-        {
-            Console.WriteLine($"[GetActiveSlot] BUILD-OFFER: SKIPPED — currentOffer will be NULL. Reasons: hasShipmentQueueId={entry.CurrentOfferedShipmentQueueId != null}, statusOk={(entry.OfferStatus == DriverOfferStatus.Pending || entry.OfferStatus == DriverOfferStatus.Expired)}, hasNavProp={entry.CurrentOfferedShipment != null}");
-        }
+        var shipmentIds    = slots.Select(s => s.ShipmentQueueId).ToList();
+        // FIXED: await the query so it runs asynchronously and actually returns results.
+        var shipmentQueues = await _db.ShipmentQueues
+            .Include(q => q.Shipment).ThenInclude(s => s.PickupAddress)
+            .Include(q => q.Shipment).ThenInclude(s => s.DropAddress)
+            .Where(q => shipmentIds.Contains(q.Id))
+            .ToDictionaryAsync(q => q.Id);
 
-        var upcoming = await _db.ShipmentQueues
-    .Include(s => s.Shipment).ThenInclude(s => s.PickupAddress)
-    .Include(s => s.Shipment).ThenInclude(s => s.DropAddress)
-    .Where(s => s.Status == ShipmentQueueStatus.Waiting
-             || s.Status == ShipmentQueueStatus.Offered)
-    .Where(s => s.Id != entry.CurrentOfferedShipmentQueueId)
-    .OrderBy(s => s.CreatedAt)
-    .Take(3)
-    .Select(s => new UpcomingShipmentDto(
-        s.Id, s.Shipment.ShipmentNumber,
-        FormatAddress(s.Shipment.PickupAddress),
-        FormatAddress(s.Shipment.DropAddress),
-        s.Shipment.AgreedPrice, s.Shipment.IsUrgent))
-    .ToListAsync();
+        // Build the DTO list — exclude skipped items entirely
+        var dtoSlots = slots
+            .Where(s => !s.IsSkipped)
+            .Select((s, idx) =>
+            {
+                if (!shipmentQueues.TryGetValue(s.ShipmentQueueId, out var sq))
+                    return null;
+                return new ShipmentSlotDto(
+                    ShipmentQueueId : s.ShipmentQueueId,
+                    ShipmentId      : sq.ShipmentId,
+                    ShipmentNumber  : sq.Shipment.ShipmentNumber,
+                    PickupLocation  : FormatAddress(sq.Shipment.PickupAddress),
+                    DropLocation    : FormatAddress(sq.Shipment.DropAddress),
+                    CargoType       : sq.Shipment.CargoType,
+                    CargoWeightKg   : sq.Shipment.CargoWeightKg,
+                    AgreedPrice     : sq.Shipment.AgreedPrice,
+                    IsUrgent        : sq.Shipment.IsUrgent,
+                    IsExpired       : s.IsExpired,
+                    ExpiresAt       : s.ExpiresAt
+                );
+            })
+            .Where(s => s != null)
+            .Cast<ShipmentSlotDto>()
+            .ToList();
 
-        Console.WriteLine($"[GetActiveSlot] RESPONSE: offerStatus={entry.OfferStatus} currentOffer={( currentOffer == null ? "NULL" : currentOffer.ShipmentQueueId.ToString())} upcoming={upcoming.Count}");
-        Console.WriteLine($"[GetActiveSlot] ── END");
+        // ClaimableCount in the DTO must account for skipped items being removed
+        // Recalculate: how many non-skipped items from the original slots
+        // fall within the original ClaimableCount range?
+        var effectiveClaimable = slots
+            .Take(entry.ClaimableCount)
+            .Count(s => !s.IsSkipped);
 
         return new ActiveEventDto(
             Active          : true,
@@ -473,51 +499,115 @@ public class QueueEventService
             EventEndTime    : activeEvent.EndTime,
             Position        : entry.Position,
             HasClaimed      : entry.HasClaimed,
-            OfferStatus     : entry.OfferStatus,
-            CurrentOffer    : currentOffer,
-            UpcomingShipments : upcoming
+            ClaimableCount  : effectiveClaimable,
+            ShipmentSlots   : dtoSlots
         );
     }
+
+    private async Task<List<ShipmentQueue>> GetActiveShipmentsAsync(QueueEvent queueEvent) =>
+        await _db.ShipmentQueues
+            .Where(s => (s.Status == ShipmentQueueStatus.Waiting
+                      || s.Status == ShipmentQueueStatus.Offered)
+                     && (s.ZoneId == null || s.ZoneId == queueEvent.ZoneId))
+            .OrderBy(s => s.CreatedAt)
+            .ToListAsync();
+
+    private async Task CreateAssignmentAsync(
+        QueueEvent        activeEvent,
+        DriverQueueEntry  entry,
+        DriverShipmentSlot slot)
+    {
+        // Check if an active Pending assignment already exists to avoid duplicates
+        var exists = await _db.ShipmentQueueAssignments
+            .AnyAsync(a => a.QueueEventId    == activeEvent.Id
+                        && a.DriverId        == entry.DriverId
+                        && a.ShipmentQueueId == slot.ShipmentQueueId
+                        && a.Outcome         == AssignmentOutcome.Pending);
+        if (exists) return;
+
+        _db.ShipmentQueueAssignments.Add(new ShipmentQueueAssignment
+        {
+            Id              = Guid.NewGuid(),
+            QueueEventId    = activeEvent.Id,
+            ShipmentQueueId = slot.ShipmentQueueId,
+            DriverId        = entry.DriverId,
+            DriverPosition  = entry.Position,
+            OfferedAt       = DateTime.UtcNow,
+            ExpiresAt       = slot.ExpiresAt ?? DateTime.UtcNow.AddSeconds(activeEvent.WindowSeconds),
+            Outcome         = AssignmentOutcome.Pending
+        });
+
+        // Keep shipment_queue status as Offered so the existing Accept lock still works
+        var sq = await _db.ShipmentQueues.FindAsync(slot.ShipmentQueueId);
+        if (sq != null && sq.Status == ShipmentQueueStatus.Waiting)
+        {
+            sq.Status         = ShipmentQueueStatus.Offered;
+            sq.CurrentDriverId = entry.DriverId;
+            sq.OfferExpiresAt  = slot.ExpiresAt;
+        }
+    }
+
+    private static List<DriverShipmentSlot> DeserialiseSlots(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<DriverShipmentSlot>>(json, _json)
+                   ?? new List<DriverShipmentSlot>();
+        }
+        catch { return new List<DriverShipmentSlot>(); }
+    }
+
+    private static string SerialiseSlots(List<DriverShipmentSlot> slots) =>
+        JsonSerializer.Serialize(slots, _json);
 
     private static string FormatAddress(Address? a) =>
         a == null ? "Unknown" : $"{a.City}, {a.State}";
 
+    // ─── Other endpoints (unchanged logic) ───────────────────────────────────
+
+    public async Task<object> GetLiveStatusAsync()
+    {
+        var activeEvent = await _db.QueueEvents
+            .OrderByDescending(e => e.StartTime)
+            .FirstOrDefaultAsync();
+
+        if (activeEvent == null)
+            return new { isLive = false, eventId = (Guid?)null, endTime = (DateTime?)null };
+
+        return new
+        {
+            isLive  = activeEvent.Status == QueueEventStatus.Live && activeEvent.EndTime > DateTime.UtcNow,
+            eventId = (Guid?)activeEvent.Id,
+            endTime = (DateTime?)activeEvent.EndTime
+        };
+    }
 
     public async Task<object> ReassignOffersAsync()
     {
         var activeEvent = await _db.QueueEvents
             .FirstOrDefaultAsync(e => e.Status == QueueEventStatus.Live
                                    && e.EndTime > DateTime.UtcNow);
-        if (activeEvent != null)
-        {
-            await AssignOffersAsync(activeEvent);
-        }
         if (activeEvent == null) return new { message = "No active event" };
-        await AssignOffersAsync(activeEvent);
+        await BuildDriverListsAsync(activeEvent);
         return new { message = "Offers reassigned" };
     }
 
-    // ─── GET live status (for Flutter to poll) ───────────────────────────────
+    // ─── GET all events (newest first) ───────────────────────────────────────
 
-    public async Task<object> GetLiveStatusAsync()
-{
-    // Fetch the most recent event regardless of status
-    var activeEvent = await _db.QueueEvents
-        .OrderByDescending(e => e.StartTime)
-        .FirstOrDefaultAsync();
-
-    if (activeEvent == null)
-        return new { isLive = false, eventId = (Guid?)null, endTime = (DateTime?)null };
-
-    return new
+    public async Task<List<QueueEventSummaryDto>> GetAllEventsAsync()
     {
-        isLive  = activeEvent.Status == QueueEventStatus.Live && activeEvent.EndTime > DateTime.UtcNow,
-        eventId = (Guid?)activeEvent.Id,   // ← always returned, even when offline
-        endTime = (DateTime?)activeEvent.EndTime
-    };
-}
+        var events = await _db.QueueEvents
+            .OrderByDescending(e => e.StartTime)
+            .ToListAsync();
 
-    // ─── TOGGLE queue event live / closed ────────────────────────────────────
+        return events.Select(e => new QueueEventSummaryDto(
+            Id            : e.Id,
+            Status        : e.Status.ToString().ToLower(),
+            StartTime     : e.StartTime,
+            EndTime       : e.EndTime,
+            WindowSeconds : e.WindowSeconds
+        )).ToList();
+    }
 
     public async Task<object?> ToggleQueueEventAsync(Guid id)
     {
@@ -530,22 +620,13 @@ public class QueueEventService
         }
         else
         {
-            // Re-open: extend end time to 2 hours from now if it has passed
             if (queueEvent.EndTime <= DateTime.UtcNow)
                 queueEvent.EndTime = DateTime.UtcNow.AddHours(2);
             queueEvent.Status = QueueEventStatus.Live;
-            // Re-assign offers for any waiting shipments
-            await AssignOffersAsync(queueEvent);
+            await BuildDriverListsAsync(queueEvent);
         }
 
         await _db.SaveChangesAsync();
-
-        return new
-        {
-            eventId = queueEvent.Id,
-            status  = queueEvent.Status,
-            endTime = queueEvent.EndTime
-        };
+        return new { eventId = queueEvent.Id, status = queueEvent.Status, endTime = queueEvent.EndTime };
     }
-
 }

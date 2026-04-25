@@ -168,65 +168,47 @@ class _QueueScreenState extends State<QueueScreen> {
 
   // ─────────────────────────────────────────────────────────────────────────
   // TOGGLE — the main action handler
+  //
+  // Flow:
+  //   No active event  → show _CreateQueueSheet to seed a new event
+  //   Active event     → toggle live ↔ closed on the existing event
   // ─────────────────────────────────────────────────────────────────────────
   Future<void> _toggleLive() async {
-    debugPrint('$_tag _toggleLive called — '
-        '_toggling: $_toggling, _isLive: $_isLive, _activeEventId: $_activeEventId');
+    if (_toggling) return;
 
-    if (_toggling) {
-      debugPrint('$_tag _toggleLive ABORTED — already toggling');
-      return;
-    }
+    // ── No event yet → open creation sheet ──────────────────────────────────
     if (_activeEventId == null) {
-      debugPrint('$_tag _toggleLive ABORTED — _activeEventId is null. '
-          'The button should be disabled; check hasEvent guard in _LiveToggleButton.');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No queue event found. Create a queue event first.'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Color(0xFFE02424),
-        ),
+      final created = await showModalBottomSheet<bool>(
+        context            : context,
+        isScrollControlled : true,
+        backgroundColor    : Colors.transparent,
+        builder: (_) => _CreateQueueSheet(api: _api),
       );
+      if (created == true) {
+        await _fetchLiveStatus();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Queue created and is now LIVE'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Color(0xFF057A55),
+          ),
+        );
+      }
       return;
     }
 
-    // ── Optimistic flip ───────────────────────────────────────────────────
-    final previousState = _isLive;
+    // ── Toggle existing event ────────────────────────────────────────────────
+    final previousState   = _isLive;
     final optimisticState = !_isLive;
-    debugPrint('$_tag _toggleLive optimistic flip: $previousState → $optimisticState '
-        '(eventId: $_activeEventId)');
-
-    setState(() {
-      _toggling = true;
-      _isLive   = optimisticState;
-    });
+    setState(() { _toggling = true; _isLive = optimisticState; });
 
     try {
-      debugPrint('$_tag _toggleLive calling api.toggleQueueEvent(${_activeEventId!})');
-      final result = await _api.toggleQueueEvent(_activeEventId!);
-
-      debugPrint('$_tag _toggleLive API response raw: $result');
-      debugPrint('$_tag   status key : ${result['status']}  '
-          '(runtimeType: ${result['status']?.runtimeType})');
-
-      if (!mounted) {
-        debugPrint('$_tag _toggleLive — widget unmounted after API call, aborting');
-        return;
-      }
-
-      final newStatus    = result['status'] as String?;
+      final result        = await _api.toggleQueueEvent(_activeEventId!);
+      if (!mounted) return;
+      final newStatus     = result['status'] as String?;
       final confirmedLive = newStatus == 'live';
-
-      debugPrint('$_tag _toggleLive confirmedLive=$confirmedLive '
-          '(optimistic was $optimisticState, previous was $previousState)');
-
-      if (confirmedLive != optimisticState) {
-        debugPrint('$_tag ⚠️  OPTIMISTIC MISMATCH — server confirmed $newStatus '
-            'but UI had already flipped to $optimisticState. Correcting.');
-      }
-
       setState(() => _isLive = confirmedLive);
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(confirmedLive
@@ -237,9 +219,7 @@ class _QueueScreenState extends State<QueueScreen> {
               confirmedLive ? const Color(0xFF057A55) : const Color(0xFF374151),
         ),
       );
-    } catch (e, st) {
-      debugPrint('$_tag _toggleLive ERROR: $e\n$st');
-      debugPrint('$_tag _toggleLive rolling back to previousState=$previousState');
+    } catch (e) {
       if (!mounted) return;
       setState(() => _isLive = previousState);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -250,11 +230,7 @@ class _QueueScreenState extends State<QueueScreen> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _toggling = false);
-        debugPrint('$_tag _toggleLive FINALLY — _toggling reset to false, '
-            'final _isLive: $_isLive');
-      }
+      if (mounted) setState(() => _toggling = false);
     }
   }
 
@@ -515,20 +491,7 @@ class _LiveToggleButtonState extends State<_LiveToggleButton>
   }
 
   void _onTap() {
-    debugPrint('$_tag ✅ ON TAP fired — hasEvent=${widget.hasEvent} '
-        'toggling=${widget.toggling}');
-    if (!widget.hasEvent) {
-      debugPrint('$_tag ❌ BLOCKED: hasEvent is FALSE — '
-          '_activeEventId is null on the parent. '
-          'Fix: make sure getQueueLiveStatus() returns a non-null eventId.');
-      return;
-    }
-    if (widget.toggling) {
-      debugPrint('$_tag ❌ BLOCKED: toggling is TRUE — '
-          'a previous toggle has not finished yet.');
-      return;
-    }
-    debugPrint('$_tag ✅ Calling onToggle callback now');
+    if (widget.toggling) return;
     widget.onToggle();
   }
 
@@ -942,4 +905,406 @@ class _StatusBadge extends StatelessWidget {
               fontSize: 11, fontWeight: FontWeight.w600, color: _color),
         ),
       );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// CREATE QUEUE SHEET
+// Bottom sheet that collects duration + window size, then seeds a new
+// queue event via POST /api/queue-events.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CreateQueueSheet extends StatefulWidget {
+  final ShipmentApiService api;
+  const _CreateQueueSheet({required this.api});
+
+  @override
+  State<_CreateQueueSheet> createState() => _CreateQueueSheetState();
+}
+
+class _CreateQueueSheetState extends State<_CreateQueueSheet>
+    with SingleTickerProviderStateMixin {
+
+  final _formKey = GlobalKey<FormState>();
+
+  // ── controllers ─────────────────────────────────────────────────────────
+  final _durationCtrl = TextEditingController(text: '2');
+  final _windowCtrl   = TextEditingController(text: '5');
+
+  // ── form state ──────────────────────────────────────────────────────────
+  String  _durationUnit = 'hours';   // 'minutes' | 'hours'
+  bool    _submitting   = false;
+  String? _error;
+
+  // ── enter animation ─────────────────────────────────────────────────────
+  late AnimationController _ctrl;
+  late Animation<double>   _fade;
+  late Animation<Offset>   _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 340));
+    _fade  = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _durationCtrl.dispose();
+    _windowCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── computed values for the preview card ─────────────────────────────────
+  double get _durationHours {
+    final v = double.tryParse(_durationCtrl.text) ?? 0;
+    return _durationUnit == 'hours' ? v : v / 60;
+  }
+
+  int get _windowMinutes => int.tryParse(_windowCtrl.text) ?? 0;
+
+  String _fmtDuration() {
+    final h = _durationHours;
+    if (h <= 0) return '—';
+    if (h < 1)  return '${(h * 60).round()} min';
+    final hrs  = h.floor();
+    final mins = ((h - hrs) * 60).round();
+    if (mins == 0) return '$hrs hr${hrs > 1 ? 's' : ''}';
+    return '$hrs hr $mins min';
+  }
+
+  String _fmtEndTime() {
+    final h = _durationHours;
+    if (h <= 0) return '—';
+    final end = DateTime.now().add(Duration(minutes: (h * 60).round()));
+    final hh  = end.hour.toString().padLeft(2, '0');
+    final mm  = end.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  // ── submit ───────────────────────────────────────────────────────────────
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_submitting) return;
+    setState(() { _submitting = true; _error = null; });
+    try {
+      await widget.api.createQueueEvent(
+        durationHours : _durationHours,
+        windowSeconds : _windowMinutes * 60,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  // ── field decoration ─────────────────────────────────────────────────────
+  InputDecoration _fieldDecoration({
+    required String label,
+    required String hint,
+    required IconData icon,
+    Widget? suffix,
+  }) =>
+      InputDecoration(
+        labelText     : label,
+        hintText      : hint,
+        prefixIcon    : Icon(icon, size: 18, color: AppColors.textSecondary),
+        suffixIcon    : suffix,
+        filled        : true,
+        fillColor     : AppColors.background,
+        labelStyle    : AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary),
+        hintStyle     : AppTextStyles.bodySm.copyWith(color: AppColors.textHint),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide  : const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide  : const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide  : const BorderSide(color: AppColors.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide  : const BorderSide(color: AppColors.error, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide  : const BorderSide(color: AppColors.error, width: 2),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.of(context).viewInsets.bottom;
+
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          decoration: BoxDecoration(
+            color        : AppColors.surface,
+            borderRadius : BorderRadius.circular(AppRadius.xl),
+            boxShadow    : [
+              BoxShadow(
+                color     : Colors.black.withOpacity(0.18),
+                blurRadius: 32,
+                offset    : const Offset(0, -4),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 24 + bottomPad),
+          child: Form(
+            key: _formKey,
+            onChanged: () => setState(() {}), // rebuild preview on every keystroke
+            child: Column(
+              mainAxisSize     : MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                // ── drag handle ─────────────────────────────────────────
+                Center(
+                  child: Container(
+                    margin     : const EdgeInsets.only(bottom: 20),
+                    width      : 36,
+                    height     : 4,
+                    decoration : BoxDecoration(
+                      color        : AppColors.border,
+                      borderRadius : BorderRadius.circular(AppRadius.pill),
+                    ),
+                  ),
+                ),
+
+                // ── header ──────────────────────────────────────────────
+                Row(
+                  children: [
+                    Container(
+                      width      : 40,
+                      height     : 40,
+                      decoration : BoxDecoration(
+                        color        : AppColors.primaryLight,
+                        borderRadius : BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: const Icon(
+                        Icons.broadcast_on_personal_rounded,
+                        color: AppColors.primary,
+                        size : 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Start Queue Session',
+                            style: AppTextStyles.headingSm),
+                        Text('Configure and go live',
+                            style: AppTextStyles.bodySm
+                                .copyWith(color: AppColors.textSecondary)),
+                      ],
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon    : const Icon(Icons.close_rounded, size: 20),
+                      color   : AppColors.textSecondary,
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ── live preview card ────────────────────────────────────
+                AnimatedContainer(
+                  duration   : const Duration(milliseconds: 200),
+                  padding    : const EdgeInsets.all(14),
+                  decoration : BoxDecoration(
+                    color        : AppColors.primaryLight,
+                    borderRadius : BorderRadius.circular(AppRadius.lg),
+                    border       : Border.all(
+                        color: AppColors.primary.withOpacity(0.15)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          size: 16, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Queue will run for ${_fmtDuration()}, ending ~${_fmtEndTime()}. '
+                          'Each driver gets a ${_windowMinutes > 0 ? '$_windowMinutes-min' : '—'} window per shipment.',
+                          style: AppTextStyles.bodySm.copyWith(
+                              color : AppColors.primary,
+                              height: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── Queue Duration field ─────────────────────────────────
+                Text('Queue Duration',
+                    style: AppTextStyles.labelMd
+                        .copyWith(color: AppColors.textSecondary)),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // numeric input
+                    Expanded(
+                      child: TextFormField(
+                        controller  : _durationCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style       : AppTextStyles.bodyMd,
+                        decoration  : _fieldDecoration(
+                          label: 'Amount',
+                          hint : 'e.g. 2',
+                          icon : Icons.timer_outlined,
+                        ),
+                        validator: (v) {
+                          final n = double.tryParse(v ?? '');
+                          if (n == null || n <= 0) return 'Enter a number';
+                          final hrs = _durationUnit == 'hours' ? n : n / 60;
+                          if (hrs > 24) return 'Max 24 hrs';
+                          if (hrs < 0.083) return 'Min 5 min';
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // unit dropdown
+                    SizedBox(
+                      width: 110,
+                      child: DropdownButtonFormField<String>(
+                        value      : _durationUnit,
+                        style      : AppTextStyles.bodyMd,
+                        decoration : _fieldDecoration(
+                          label: 'Unit',
+                          hint : '',
+                          icon : Icons.access_time_rounded,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'minutes', child: Text('Minutes')),
+                          DropdownMenuItem(value: 'hours',   child: Text('Hours')),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _durationUnit = v ?? 'hours'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // ── Driver Window field ──────────────────────────────────
+                Text('Driver Window',
+                    style: AppTextStyles.labelMd
+                        .copyWith(color: AppColors.textSecondary)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller  : _windowCtrl,
+                  keyboardType: TextInputType.number,
+                  style       : AppTextStyles.bodyMd,
+                  decoration  : _fieldDecoration(
+                    label : 'Minutes per shipment',
+                    hint  : 'e.g. 5',
+                    icon  : Icons.hourglass_bottom_rounded,
+                    suffix: Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Align(
+                        widthFactor: 1,
+                        child: Text('min',
+                            style: AppTextStyles.labelMd
+                                .copyWith(color: AppColors.textSecondary)),
+                      ),
+                    ),
+                  ),
+                  validator: (v) {
+                    final n = int.tryParse(v ?? '');
+                    if (n == null || n <= 0) return 'Enter a whole number';
+                    if (n > 60) return 'Max 60 min';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 28),
+
+                // ── error banner ─────────────────────────────────────────
+                if (_error != null) ...[
+                  Container(
+                    padding   : const EdgeInsets.all(12),
+                    margin    : const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color        : AppColors.errorLight,
+                      borderRadius : BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            size: 16, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_error!,
+                              style: AppTextStyles.bodySm
+                                  .copyWith(color: AppColors.error)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // ── submit ───────────────────────────────────────────────
+                SizedBox(
+                  width : double.infinity,
+                  height: 52,
+                  child : ElevatedButton(
+                    onPressed: _submitting ? null : _submit,
+                    style    : ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textOnPrimary,
+                      shape          : RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width : 20,
+                            height: 20,
+                            child : CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color      : Colors.white,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.sensors_rounded, size: 18),
+                              SizedBox(width: 8),
+                              Text('Go Live',
+                                  style: TextStyle(
+                                      fontSize    : 15,
+                                      fontWeight  : FontWeight.w600,
+                                      letterSpacing: 0.2)),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -1,0 +1,28 @@
+Machine Requirements:
+RAM: 8 GB
+CPU: 4 vCPUs (minimum)
+Storage: 10 GB SSD
+
+Backend Requirements:
+
+.NET Runtime (8.0)
+ASP.NET Core Web Server
+
+Frontend Requirements:
+
+Flutter Web build hosting (served via Nginx or equivalent)
+
+Database Requirements:
+
+PostgreSQL / SQL Server
+Storage Allocation: Minimum 10 GB (scalable based on usage)
+
+Network Requirements:
+
+Stable internet connection with public IP (for external access)
+Open ports: 80 (HTTP), 443 (HTTPS)
+
+Additional Requirements:
+
+Docker support (preferred for containerized deployment)
+SSL certificate for secure access (HTTPS)

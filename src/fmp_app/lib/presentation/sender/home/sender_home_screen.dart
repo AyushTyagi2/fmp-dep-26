@@ -579,7 +579,7 @@ class _ShipmentCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '\$${shipment['amount'].toStringAsFixed(2)}',
+                'Rs ${shipment['amount'].toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
