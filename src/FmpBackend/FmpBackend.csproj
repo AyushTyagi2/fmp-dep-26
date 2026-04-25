@@ -12,6 +12,8 @@
     <!-- ✅ REMOVED: Microsoft.AspNetCore.App — causes NETSDK1080 warning and is wrong for net8.0 -->
     <!-- net8.0 + Microsoft.NET.Sdk.Web already includes the full ASP.NET Core shared framework -->
 
+    <PackageReference Include="MailKit" Version="4.15.1" />
+
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.2" />
 
     <!-- EF Core -->
@@ -28,6 +30,8 @@
     <!-- ✅ NEW: JWT token creation/validation -->
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.5.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.2" />
+    <!-- Google token validation (for /auth/google endpoint) -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
   </ItemGroup>
 
 </Project>

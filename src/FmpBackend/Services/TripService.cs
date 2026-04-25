@@ -121,17 +121,19 @@ public class TripService
 
             // Also reset any accepted DriverQueueEntry for the driver so they
             // appear as "idle" again on the queue screen instead of "accepted".
+            // Find any accepted DriverQueueEntry for this driver and reset it
+            // so they appear as idle again on the queue screen.
             var staleEntry = await _db.DriverQueueEntries
-                .Where(e => e.DriverId     == trip.DriverId
-                         && e.OfferStatus  == DriverOfferStatus.Accepted)
+                .Where(e => e.DriverId   == trip.DriverId
+                         && e.HasClaimed == true)
                 .OrderByDescending(e => e.ClaimWindowStart)
                 .FirstOrDefaultAsync();
 
             if (staleEntry != null)
             {
-                staleEntry.OfferStatus  = DriverOfferStatus.Idle;
-                staleEntry.HasClaimed   = false;
-                staleEntry.CurrentOfferedShipmentQueueId = null;
+                staleEntry.HasClaimed      = false;
+                staleEntry.ClaimableCount  = 0;
+                staleEntry.ShipmentListJson = "[]";
                 await _db.SaveChangesAsync();
             }
         }
@@ -142,6 +144,30 @@ public class TripService
     public async Task<List<TripDto>> GetByDriverAsync(Guid driverId) =>
         (await _repo.GetByDriverAsync(driverId)).Select(ToDto).ToList();
 
+    /// <summary>
+    /// Driver trip search: filters a driver's own trips by free-text (tripNumber, shipmentNumber)
+    /// and optionally by status.
+    /// </summary>
+    public async Task<List<TripDto>> SearchByDriverAsync(Guid driverId, string? q, string? status)
+    {
+        var trips = await _repo.GetByDriverAsync(driverId);
+
+        IEnumerable<Trip> result = trips;
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var lower = q.ToLower();
+            result = result.Where(t =>
+                t.TripNumber.ToLower().Contains(lower) ||
+                (t.Shipment?.ShipmentNumber?.ToLower().Contains(lower) ?? false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+            result = result.Where(t => t.CurrentStatus == status);
+
+        return result.Select(ToDto).ToList();
+    }
+
     private static TripDto ToDto(Trip t) => new(
         t.Id, t.TripNumber, t.ShipmentId, t.Shipment?.ShipmentNumber ?? "",
         t.VehicleId, t.DriverId, t.AssignedUnionId, t.AssignedFleetOwnerId,
@@ -150,5 +176,7 @@ public class TripService
         t.CurrentLatitude, t.CurrentLongitude, t.LastLocationUpdateAt,
         t.DeliveredAt, t.DeliveredToName, t.ProofOfDeliveryUrl, t.DeliveryNotes,
         t.SenderRating, t.ReceiverRating, t.DriverPaymentAmount, t.DriverPaymentStatus,
-        t.HasIssues, t.IssueDescription, t.CreatedAt, t.UpdatedAt, t.CompletedAt);
+        t.HasIssues, t.IssueDescription, t.CreatedAt, t.UpdatedAt, t.CompletedAt, 
+        t.Shipment?.SenderOrganization?.Name ?? "",
+        t.Shipment?.ReceiverOrganization?.Name ?? "");
 }

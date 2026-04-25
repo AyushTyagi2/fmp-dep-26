@@ -22,17 +22,17 @@ class CommonProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone    = AppSession.phone    ?? '—';
+    final email    = AppSession.email    ?? '—';
     final role     = AppSession.roleLabel;
     final driverId = AppSession.driverId;
 
     // Role-specific accent colour and icon
     final (accent, icon) = _roleStyle(AppSession.role);
 
-    // Initials from phone (last 4 digits as fallback)
-    final initials = phone.length >= 2
-        ? phone.replaceAll(RegExp(r'[^0-9]'), '').substring(
-            (phone.replaceAll(RegExp(r'[^0-9]'), '').length - 2)
+    // Initials from email (last 4 digits as fallback)
+    final initials = email.length >= 2
+        ? email.replaceAll(RegExp(r'[^0-9]'), '').substring(
+            (email.replaceAll(RegExp(r'[^0-9]'), '').length - 2)
                 .clamp(0, double.maxFinite.toInt()))
         : '??';
 
@@ -43,7 +43,7 @@ class CommonProfileScreen extends StatelessWidget {
           // ── Hero header ─────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: _ProfileHero(
-              phone: phone,
+              email: email,
               role: role,
               initials: initials,
               accent: accent,
@@ -62,9 +62,9 @@ class CommonProfileScreen extends StatelessWidget {
                   _SectionLabel('ACCOUNT INFO'),
                   const SizedBox(height: AppSpacing.sm),
                   _InfoTile(
-                    icon: Icons.phone_rounded,
-                    label: 'Phone Number',
-                    value: phone,
+                    icon: Icons.email_rounded,
+                    label: 'Email',
+                    value: email,
                     accent: accent,
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -161,14 +161,14 @@ class CommonProfileScreen extends StatelessWidget {
 // ─── Hero header ─────────────────────────────────────────────────────────────
 
 class _ProfileHero extends StatelessWidget {
-  final String phone;
+  final String email;
   final String role;
   final String initials;
   final Color accent;
   final IconData icon;
 
   const _ProfileHero({
-    required this.phone,
+    required this.email,
     required this.role,
     required this.initials,
     required this.accent,
@@ -217,9 +217,9 @@ class _ProfileHero extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              // Phone
+              // email
               Text(
-                phone,
+                email,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,

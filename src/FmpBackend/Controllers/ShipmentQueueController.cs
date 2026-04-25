@@ -9,7 +9,13 @@ namespace FmpBackend.Controllers;
 public class ShipmentQueueController : ControllerBase
 {
     private readonly ShipmentQueueService _svc;
-    public ShipmentQueueController(ShipmentQueueService svc) => _svc = svc;
+    private readonly QueueEventService   _queueEventSvc;
+
+    public ShipmentQueueController(ShipmentQueueService svc, QueueEventService queueEventSvc)
+    {
+        _svc           = svc;
+        _queueEventSvc = queueEventSvc;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetWaiting(
@@ -31,30 +37,32 @@ public class ShipmentQueueController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
-    // Returns { success, tripId } so Flutter can navigate to active trip
     [HttpPost("{id:guid}/accept")]
     public async Task<IActionResult> Accept(Guid id, [FromBody] AcceptQueueItemRequest req)
     {
-        var result = await _svc.AcceptAsync(id, req.DriverId);
-
-        if (result.error != null)
-            return Conflict(new AcceptQueueItemResponse(false, null, result.error));
-
-        return Ok(new AcceptQueueItemResponse(true, result.tripId, "Shipment accepted."));
+        var (tripId, error) = await _svc.AcceptAsync(id, req.DriverId);
+        if (error != null)
+        {
+            if (error.Contains("already accepted") || error.Contains("already claimed"))
+                return Conflict(new AcceptQueueItemResponse(false, null, error));
+            return BadRequest(new AcceptQueueItemResponse(false, null, error));
+        }
+        return Ok(new AcceptQueueItemResponse(true, tripId, null));
     }
 
-    // Bug 1 fix: wired up the missing pass endpoint
     [HttpPost("{id:guid}/pass")]
     public async Task<IActionResult> Pass(Guid id, [FromBody] PassQueueItemRequest req)
     {
-        var result = await _svc.PassAsync(id, req.DriverId);
+        var (success, error) = await _svc.PassAsync(id, req.DriverId);
+        if (!success)
+            return Conflict(new PassOfferResponse(false, error, null));
 
-        if (!result.success)
-            return Conflict(new PassOfferResponse(false, result.error));
-
-        return Ok(new PassOfferResponse(true, "Shipment passed."));
+        var nextSlot = await _queueEventSvc.GetActiveEventForDriverAsync(req.DriverId);
+        return Ok(new PassOfferResponse(true, "Shipment passed.", nextSlot));
     }
 }
 
 public record EnqueueRequest(Guid ShipmentId, string? RequiredVehicleType, Guid? ZoneId);
 public record PassQueueItemRequest(Guid DriverId);
+// PassOfferResponse is defined in Dtos/QueueEventDto.cs (NextSlot: ActiveEventDto?)
+// Do NOT redeclare it here — a local record shadows the Dto one and breaks serialisation.

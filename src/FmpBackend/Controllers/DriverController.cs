@@ -57,6 +57,26 @@ public class DriverController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Fleet Manager driver search — GET /drivers/fleetowners/phone/{phone}/drivers/search?q=&amp;status=
+    /// </summary>
+    [HttpGet("fleetowners/phone/{phone}/drivers/search")]
+    public IActionResult SearchDriversForFleetOwner(
+        [FromRoute] string phone,
+        [FromQuery] string? q = null,
+        [FromQuery] string? status = null)
+    {
+        try
+        {
+            var result = _driverService.SearchDriversForFleetOwnerByPhone(phone, q, status);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpGet("fleetowners/phone/{phone}/dashboard")]
     public IActionResult GetDashboardForFleetOwnerByPhone([FromRoute] string phone)
     {

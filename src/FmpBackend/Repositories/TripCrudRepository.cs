@@ -10,22 +10,38 @@ public class TripCrudRepository
     public TripCrudRepository(AppDbContext db) => _db = db;
 
     public async Task<(List<Trip> items, int total)> GetAllAsync(int page, int pageSize, string? status)
-    {
-        var q = _db.Trips.Include(t => t.Shipment).AsQueryable();
-        if (status != null) q = q.Where(t => t.CurrentStatus == status);
-        q = q.OrderByDescending(t => t.CreatedAt);
-        var total = await q.CountAsync();
-        var items = await q.Skip((page-1)*pageSize).Take(pageSize).ToListAsync();
-        return (items, total);
-    }
+{
+    var q = _db.Trips
+        .Include(t => t.Shipment)
+            .ThenInclude(s => s!.SenderOrganization)
+        .Include(t => t.Shipment)
+            .ThenInclude(s => s!.ReceiverOrganization)
+        .AsQueryable();
 
-    public async Task<Trip?> GetByIdAsync(Guid id) =>
-        await _db.Trips.Include(t => t.Shipment).FirstOrDefaultAsync(t => t.Id == id);
+    if (status != null) q = q.Where(t => t.CurrentStatus == status);
+    q = q.OrderByDescending(t => t.CreatedAt);
+    var total = await q.CountAsync();
+    var items = await q.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+    return (items, total);
+}
 
-    public async Task<List<Trip>> GetByDriverAsync(Guid driverId) =>
-        await _db.Trips.Include(t => t.Shipment)
-                  .Where(t => t.DriverId == driverId)
-                  .OrderByDescending(t => t.CreatedAt).ToListAsync();
+public async Task<Trip?> GetByIdAsync(Guid id) =>
+    await _db.Trips
+        .Include(t => t.Shipment)
+            .ThenInclude(s => s!.SenderOrganization)
+        .Include(t => t.Shipment)
+            .ThenInclude(s => s!.ReceiverOrganization)
+        .FirstOrDefaultAsync(t => t.Id == id);
+
+public async Task<List<Trip>> GetByDriverAsync(Guid driverId) =>
+    await _db.Trips
+        .Include(t => t.Shipment)
+            .ThenInclude(s => s!.SenderOrganization)
+        .Include(t => t.Shipment)
+            .ThenInclude(s => s!.ReceiverOrganization)
+        .Where(t => t.DriverId == driverId)
+        .OrderByDescending(t => t.CreatedAt)
+        .ToListAsync();
 
     public async Task AddAsync(Trip trip)
         { _db.Trips.Add(trip); await _db.SaveChangesAsync(); }

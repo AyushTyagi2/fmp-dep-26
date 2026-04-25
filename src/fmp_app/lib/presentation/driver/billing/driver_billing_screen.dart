@@ -30,14 +30,31 @@ class _DriverBillingScreenState extends State<DriverBillingScreen> {
   Future<void> _loadTrips() async {
     final driverId = AppSession.driverId;
     if (driverId == null) {
-      if (mounted) setState(() { _loading = false; _error = 'Session expired'; });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Session expired';
+        });
+      }
       return;
     }
+
     try {
       final trips = await _tripApi.getDriverTrips(driverId);
-      if (mounted) setState(() { _trips = trips; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _trips = trips;
+          _loading = false;
+          _error = null;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 

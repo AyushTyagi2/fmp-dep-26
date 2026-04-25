@@ -37,7 +37,7 @@ class _SenderCreateShipmentScreenState
     if (!_formKey.currentState!.validate()) return;
     setState(() => isLoading = true);
     try {
-      final senderPhone = AppSession.phone;
+      final senderPhone = AppSession.email;
       if (senderPhone == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Session expired. Please login again.')),

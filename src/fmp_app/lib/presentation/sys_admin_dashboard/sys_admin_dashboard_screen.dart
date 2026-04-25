@@ -29,7 +29,7 @@ class _SysAdminDashboardScreenState extends State<SysAdminDashboardScreen> {
     LogsView(),
     QueueView(),
     RulesView(),
-    CommonProfileScreen(), // index 5
+    CommonProfileScreen(), // index 6
   ];
 
   static const _navItems = [
@@ -92,7 +92,7 @@ class _AdminDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = AppSession.phone ?? 'Administrator';
+    final phone = AppSession.email ?? 'Administrator';
 
     return Drawer(
       backgroundColor: const Color(0xFF0F172A),
@@ -300,10 +300,10 @@ class _AdminAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Tap avatar → jump straight to Profile (index 5)
+        // Tap avatar → jump straight to Profile (index 6)
         final state = context
             .findAncestorStateOfType<_SysAdminDashboardScreenState>();
-        state?.setState(() => state._selectedIndex = 5);
+        state?.setState(() => state._selectedIndex = 6);
       },
       child: Container(
         width: 36,

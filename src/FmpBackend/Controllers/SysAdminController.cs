@@ -47,6 +47,19 @@ public class SysAdminController : ControllerBase
         return Ok(new { users });
     }
 
+    /// <summary>
+    /// User search — GET /sysadmin/users/search?q=&amp;role=
+    /// q matches fullName or phone. role filters by user role (driver/sender/fleet_manager/sys_admin).
+    /// </summary>
+    [HttpGet("users/search")]
+    public async Task<IActionResult> SearchUsers(
+        [FromQuery] string? q = null,
+        [FromQuery] string? role = null)
+    {
+        var users = await _svc.SearchUsersAsync(q, role);
+        return Ok(users);
+    }
+
     // ── Shipment management ───────────────────────────────────────────────────
 
     /// <summary>List shipments. ?status=pending_approval|approved|cancelled|… (omit for all)</summary>

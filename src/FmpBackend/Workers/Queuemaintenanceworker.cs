@@ -6,21 +6,20 @@ using Microsoft.EntityFrameworkCore;
 namespace FmpBackend.Workers;
 
 /// <summary>
-/// Background worker running every 30 seconds.
+/// Background worker — ticks every 15 seconds (halved from 30 because the
+/// new architecture doesn't do full table scans; each tick is cheaper).
 ///
-/// 1. Detect expired ShipmentQueueAssignments → mark expired, revert shipment
-///    to "waiting", clear driver's offer, re-run AssignOffersAsync to cascade
-///    the shipment to the next driver in line.
+/// 1. Find Pending assignments whose ExpiresAt has passed.
+///    For each: flip outcome=Expired, call QueueEventService.OnWindowExpiredAsync.
+///    OnWindowExpiredAsync handles all list mutations atomically.
 ///
 /// 2. Close QueueEvents whose EndTime has passed.
-///
-/// 3. Revert any still-"offered" shipments back to "waiting" on event close.
 /// </summary>
 public class QueueMaintenanceWorker : BackgroundService
 {
     private readonly IServiceScopeFactory            _scopeFactory;
     private readonly ILogger<QueueMaintenanceWorker> _logger;
-    private static readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan _interval = TimeSpan.FromSeconds(15);
 
     public QueueMaintenanceWorker(IServiceScopeFactory scopeFactory, ILogger<QueueMaintenanceWorker> logger)
     {
@@ -34,7 +33,7 @@ public class QueueMaintenanceWorker : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             try   { await RunMaintenanceAsync(); }
-            catch (Exception ex) { _logger.LogError(ex, "QueueMaintenanceWorker error: {Message}", ex.Message); }
+            catch (Exception ex) { _logger.LogError(ex, "Worker error: {Message}", ex.Message); }
             await Task.Delay(_interval, stoppingToken);
         }
     }
@@ -42,101 +41,36 @@ public class QueueMaintenanceWorker : BackgroundService
     private async Task RunMaintenanceAsync()
     {
         using var scope = _scopeFactory.CreateScope();
-        var db          = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var now         = DateTime.UtcNow;
+        var db  = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var svc = scope.ServiceProvider.GetRequiredService<QueueEventService>();
+        var now = DateTime.UtcNow;
 
-        // ── 1. Cascade expired offer assignments ─────────────────────────────
-        var expiredAssignments = await db.ShipmentQueueAssignments
+        Console.WriteLine($"[Worker] TICK {now:O}");
+
+        // ── 1. Process expired assignment windows ──────────────────────────────
+        var expired = await db.ShipmentQueueAssignments
             .Where(a => a.Outcome == AssignmentOutcome.Pending && a.ExpiresAt < now)
             .ToListAsync();
 
-        if (expiredAssignments.Any())
+        Console.WriteLine($"[Worker] expired assignments: {expired.Count}");
+
+        foreach (var assignment in expired)
         {
-            foreach (var assignment in expiredAssignments)
-            {
-                assignment.Outcome = AssignmentOutcome.Expired;
-
-                // Revert shipment to waiting
-                var shipment = await db.ShipmentQueues.FindAsync(assignment.ShipmentQueueId);
-                if (shipment is { Status: ShipmentQueueStatus.Offered })
-                {
-                    shipment.Status          = ShipmentQueueStatus.Waiting;
-                    shipment.CurrentDriverId = null;
-                    shipment.OfferExpiresAt  = null;
-                }
-
-                // Clear driver entry so they become idle for next offer
-                var driverEntry = await db.DriverQueueEntries
-                    .FirstOrDefaultAsync(e => e.QueueEventId == assignment.QueueEventId
-                                           && e.DriverId     == assignment.DriverId);
-                if (driverEntry != null)
-                {
-                    driverEntry.CurrentOfferedShipmentQueueId = null;
-                    driverEntry.OfferStatus                   = DriverOfferStatus.Expired;
-                }
-            }
-
+            // Flip outcome first so a double-tick doesn't process it twice
+            assignment.Outcome = AssignmentOutcome.Expired;
             await db.SaveChangesAsync();
-            _logger.LogInformation("Expired {Count} offer assignments.", expiredAssignments.Count);
 
-            // Re-run matching for each affected live event to cascade shipments
-            var affectedEventIds = expiredAssignments.Select(a => a.QueueEventId).Distinct();
-            foreach (var eventId in affectedEventIds)
-            {
-                var evt = await db.QueueEvents.FindAsync(eventId);
-                if (evt is { Status: QueueEventStatus.Live })
-                {
-                    // Resolve QueueEventService from DI so it has all its dependencies
-                    var svc = scope.ServiceProvider.GetRequiredService<QueueEventService>();
-                    await svc.AssignOffersAsync(evt);
-                    _logger.LogInformation("Re-assigned offers for event {EventId}.", eventId);
-                }
-            }
+            // Delegate all list mutations to the service
+            await svc.OnWindowExpiredAsync(assignment);
+            _logger.LogInformation("Window expired: driver={D} shipment={S}", assignment.DriverId, assignment.ShipmentQueueId);
         }
 
-        // ── 2. Unconditional matching pass ───────────────────────────────────
-var liveEvents = await db.QueueEvents
-    .Where(e => e.Status == QueueEventStatus.Live && e.EndTime > now)
-    .ToListAsync();
-
-foreach (var liveEvent in liveEvents)
-{
-    var hasIdleDrivers = await db.DriverQueueEntries
-        .AnyAsync(e => e.QueueEventId == liveEvent.Id
-                    && !e.HasClaimed
-                    && (e.OfferStatus == DriverOfferStatus.Idle
-                     || e.OfferStatus == DriverOfferStatus.Passed
-                     || e.OfferStatus == DriverOfferStatus.Expired));
-
-    var hasWaitingShipments = await db.ShipmentQueues
-        .AnyAsync(s => s.Status == ShipmentQueueStatus.Waiting
-                    && (s.ZoneId == null || s.ZoneId == liveEvent.ZoneId));
-
-    if (hasIdleDrivers && hasWaitingShipments)
-    {
-        var svc = scope.ServiceProvider.GetRequiredService<QueueEventService>();
-        await svc.AssignOffersAsync(liveEvent);
-    }
-}
-
-        // ── 2. Close expired QueueEvents ─────────────────────────────────────
-        var closedEvents = await db.QueueEvents
+        // ── 2. Close expired events ────────────────────────────────────────────
+        var closed = await db.QueueEvents
             .Where(e => e.Status == QueueEventStatus.Live && e.EndTime <= now)
             .ExecuteUpdateAsync(s => s.SetProperty(e => e.Status, QueueEventStatus.Closed));
 
-        if (closedEvents > 0)
-            _logger.LogInformation("Closed {Count} expired queue events.", closedEvents);
-
-        // ── 3. Revert any orphaned "offered" shipments back to waiting ────────
-        var reverted = await db.ShipmentQueues
-            .Where(q => q.Status == ShipmentQueueStatus.Offered
-                     && q.OfferExpiresAt < now)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(q => q.Status,          ShipmentQueueStatus.Waiting)
-                .SetProperty(q => q.CurrentDriverId, (Guid?)null)
-                .SetProperty(q => q.OfferExpiresAt,  (DateTime?)null));
-
-        if (reverted > 0)
-            _logger.LogInformation("Reverted {Count} orphaned offered shipments to waiting.", reverted);
+        if (closed > 0)
+            _logger.LogInformation("Closed {N} expired queue events.", closed);
     }
 }

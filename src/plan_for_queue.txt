@@ -1,0 +1,32 @@
+queue starts:-
+
+1. detect all eligible drivers.
+2. detect all eligible shipments(which are still not chosen).
+3. send a json containing shipments to each driver, it'd be a pair <json<shipmentN, bool>, number of eligible shipments>
+4. every json is dynamically generated and when initialized they'd be set to <json<shipmentN, false>, 0> except for the top spot which would be <json<shipment1, false>, 1>
+
+window starts:-
+
+1. driver1's window is default to start and his tuple would be set to this <json<shipmentN, bool>, 1> initially.
+
+window exhausts:-
+
+1. driver2's tuple would be updated to <json<shipmentN, false>, 1>.
+2. driver1's tuple is updated to <json<shipment1, true>, <shipment2, false>, ....,<shipmentN, false>>, 2>.
+
+driver accepts:-
+
+1. driver's status is changed to occupied(can be chosen from one flag already in the db).
+2. driver is removed from the driver_queue_entry.
+3. shipment  is flagged as accepted and hence will not be shown further. 
+4. update the json being sent to driver as the same list of shipment will also need to be updated that shipment will be removed from the list as accepted by other driver.
+
+driver passes:-
+
+1. update the json list of driver2 <json<shipmentN, false> , 2>
+
+edge cases:-
+
+1. count = 2, it means 1 can be accepted whereas the countodown for 2 is still going on that mean accept b/w 1 or 2.
+2. just open s3 for D2 sooner and the past would still be claimable.
+3. we'll update it on each mutation. and rebubilt it

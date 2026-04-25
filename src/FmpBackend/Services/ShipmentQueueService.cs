@@ -22,27 +22,23 @@ public class ShipmentQueueService
         IHubContext<ShipmentQueueHub> hub,
         QueueEventService             queueEventService)
     {
-        _repo               = repo;
-        _db                 = db;
-        _tripService        = tripService;
-        _hub                = hub;
-        _queueEventService  = queueEventService;
+        _repo              = repo;
+        _db                = db;
+        _tripService       = tripService;
+        _hub               = hub;
+        _queueEventService = queueEventService;
     }
 
-    // ─── List ────────────────────────────────────────────────────────────────
+    // ─── List / GetById (unchanged) ──────────────────────────────────────────
 
     public async Task<object> GetWaitingAsync(int page, int pageSize)
     {
         var (items, total) = await _repo.GetWaitingAsync(page, pageSize);
-        var totalPages     = (int)Math.Ceiling(total / (double)pageSize);
-
         return new
         {
-            page,
-            pageSize,
-            total,
-            totalPages,
-            hasNextPage = page < totalPages,
+            page, pageSize, total,
+            totalPages  = (int)Math.Ceiling(total / (double)pageSize),
+            hasNextPage = page < (int)Math.Ceiling(total / (double)pageSize),
             hasPrevPage = page > 1,
             items       = items.Select(ToDto).ToList()
         };
@@ -54,7 +50,7 @@ public class ShipmentQueueService
         return item == null ? null : ToDto(item);
     }
 
-    // ─── Enqueue ─────────────────────────────────────────────────────────────
+    // ─── Enqueue ──────────────────────────────────────────────────────────────
 
     public async Task<ShipmentQueueDto> EnqueueAsync(Guid shipmentId, string? vehicleType, Guid? zoneId)
     {
@@ -70,41 +66,50 @@ public class ShipmentQueueService
         await _repo.AddAsync(item);
         var dto = (await GetByIdAsync(item.Id))!;
 
-        // Broadcast new shipment
         await _hub.Clients.All.SendAsync("NewShipmentAvailable", dto);
 
-        // Try to assign this shipment to an idle driver in the live event
+        // Rebuild lists so drivers who have no offers get this shipment appended
         var activeEvent = await _db.QueueEvents
             .FirstOrDefaultAsync(e => e.Status == QueueEventStatus.Live
                                    && e.EndTime > DateTime.UtcNow);
-
         if (activeEvent != null)
-        {
-            await _queueEventService.AssignOffersAsync(activeEvent);
-        }
+            await _queueEventService.BuildDriverListsAsync(activeEvent);
 
         return dto;
     }
 
-    // ─── Accept ──────────────────────────────────────────────────────────────
+    // ─── Accept ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Validates that the driver is accepting their currently-offered shipment.
-    /// A driver cannot accept a shipment offered to someone else.
-    /// </summary>
     public async Task<(Guid? tripId, string? error)> AcceptAsync(Guid queueItemId, Guid driverId)
     {
-        Console.WriteLine($"=== ACCEPT === QueueItemId:{queueItemId} DriverId:{driverId}");
+        Console.WriteLine($"[Accept] queueItemId={queueItemId} driverId={driverId}");
 
-        var vehicle = await _db.Vehicles
-            .FirstOrDefaultAsync(v => v.CurrentDriverId == driverId
-                                   && v.AvailabilityStatus == VehicleStatus.Available);
-        if (vehicle == null) return (null, "No available vehicle assigned to this driver.");
+        // Vehicle check (unchanged)
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.CurrentDriverId == driverId);
+        if (vehicle == null)
+            return (null, "No vehicle assigned. Contact your fleet manager.");
+
+        if (vehicle.AvailabilityStatus == VehicleStatus.OnTrip)
+        {
+            var hasActiveTrip = await _db.Trips.AnyAsync(t =>
+                t.DriverId == driverId && TripStatus.ActiveStatuses.Contains(t.CurrentStatus));
+            if (hasActiveTrip)
+                return (null, "You already have an active trip.");
+            vehicle.AvailabilityStatus = VehicleStatus.Available;
+            var driverReset = await _db.Drivers.FindAsync(driverId);
+            if (driverReset?.AvailabilityStatus == DriverAvailabilityStatus.OnTrip)
+                driverReset.AvailabilityStatus = DriverAvailabilityStatus.Available;
+            await _db.SaveChangesAsync();
+        }
+
+        if (vehicle.AvailabilityStatus != VehicleStatus.Available)
+            return (null, $"Vehicle not available (status: {vehicle.AvailabilityStatus}).");
 
         var driver = await _db.Drivers.FindAsync(driverId);
-        if (driver == null) return (null, "Driver record not found.");
-        if (driver.CurrentFleetOwnerId == null) return (null, "Driver is not assigned to a fleet owner.");
+        if (driver == null)           return (null, "Driver record not found.");
+        if (driver.CurrentFleetOwnerId == null) return (null, "Driver has no fleet owner.");
 
+        // Validate via driver's slot — shipment must be within claimable range
         var activeEvent = await _db.QueueEvents
             .FirstOrDefaultAsync(e => e.Status == QueueEventStatus.Live
                                    && e.EndTime > DateTime.UtcNow);
@@ -112,27 +117,26 @@ public class ShipmentQueueService
         if (activeEvent != null)
         {
             var entry = await _db.DriverQueueEntries
-                .FirstOrDefaultAsync(e => e.QueueEventId == activeEvent.Id && e.DriverId == driverId);
-
+                .FirstOrDefaultAsync(e => e.QueueEventId == activeEvent.Id
+                                       && e.DriverId     == driverId);
             if (entry != null)
             {
                 if (entry.HasClaimed)
                     return (null, "You have already claimed a shipment in this queue event.");
 
-                // ── OFFER VALIDATION ──────────────────────────────────────────
-                // The driver must only accept the shipment currently offered to them.
-                if (entry.CurrentOfferedShipmentQueueId == null)
-                    return (null, "You have no active offer. Wait for a shipment to be assigned to you.");
-
-                if (entry.CurrentOfferedShipmentQueueId != queueItemId)
-                    return (null, "You can only accept the shipment currently offered to you.");
-
-                if (entry.OfferStatus != DriverOfferStatus.Pending)
-                    return (null, $"Your offer is no longer active (status: {entry.OfferStatus}).");
+                // Deserialise list — shipment must be in the claimable range
+                var slots = DeserialiseSlots(entry.ShipmentListJson);
+                var slotIdx = slots.FindIndex(s => s.ShipmentQueueId == queueItemId);
+                if (slotIdx < 0)
+                    return (null, "That shipment is not in your offer list.");
+                if (slotIdx >= entry.ClaimableCount)
+                    return (null, "That shipment's window hasn't opened for you yet.");
+                if (slots[slotIdx].IsSkipped)
+                    return (null, "You already passed that shipment.");
             }
         }
 
-        // ── Race-safe accept ──────────────────────────────────────────────────
+        // Race-safe accept (same transaction pattern as before)
         for (int attempt = 0; attempt < 3; attempt++)
         {
             await using var tx = await _db.Database.BeginTransactionAsync();
@@ -150,33 +154,38 @@ public class ShipmentQueueService
                 await _repo.SaveAsync();
 
                 driver.AvailabilityStatus = DriverAvailabilityStatus.OnTrip;
-                await _db.SaveChangesAsync();
 
                 if (activeEvent != null)
                 {
-                    // Mark driver entry
                     var entry = await _db.DriverQueueEntries
-                        .FirstOrDefaultAsync(e => e.QueueEventId == activeEvent.Id && e.DriverId == driverId);
+                        .FirstOrDefaultAsync(e => e.QueueEventId == activeEvent.Id
+                                               && e.DriverId     == driverId);
                     if (entry != null)
                     {
-                        entry.HasClaimed   = true;
-                        entry.OfferStatus  = DriverOfferStatus.Accepted;
-                        await _db.SaveChangesAsync();
+                        entry.HasClaimed = true;
                     }
 
-                    // Close the assignment record
-                    var assignment = await _db.ShipmentQueueAssignments
+                    // Close winner's assignment
+                    var winnerAssignment = await _db.ShipmentQueueAssignments
                         .FirstOrDefaultAsync(a => a.QueueEventId    == activeEvent.Id
                                                && a.ShipmentQueueId == queueItemId
                                                && a.DriverId        == driverId
                                                && a.Outcome         == AssignmentOutcome.Pending);
-                    if (assignment != null)
-                    {
-                        assignment.Outcome = AssignmentOutcome.Accepted;
-                        await _db.SaveChangesAsync();
-                    }
+                    if (winnerAssignment != null)
+                        winnerAssignment.Outcome = AssignmentOutcome.Accepted;
+
+                    // Cancel all other Pending assignments on same shipment
+                    var losingAssignments = await _db.ShipmentQueueAssignments
+                        .Where(a => a.QueueEventId    == activeEvent.Id
+                                 && a.ShipmentQueueId == queueItemId
+                                 && a.DriverId        != driverId
+                                 && a.Outcome         == AssignmentOutcome.Pending)
+                        .ToListAsync();
+                    foreach (var l in losingAssignments)
+                        l.Outcome = AssignmentOutcome.Expired;
                 }
 
+                await _db.SaveChangesAsync();
                 await tx.CommitAsync();
 
                 var trip = await _tripService.CreateAsync(new CreateTripRequest(
@@ -192,28 +201,25 @@ public class ShipmentQueueService
                     EstimatedDurationHours: null
                 ));
 
+                // Remove accepted shipment from ALL drivers' lists
+                if (activeEvent != null)
+                    await _queueEventService.OnShipmentAcceptedAsync(activeEvent.Id, queueItemId);
+
                 await _hub.Clients.All.SendAsync("ShipmentAccepted", queueItemId);
                 return (trip.Id, null);
             }
             catch (DbUpdateConcurrencyException) { await tx.RollbackAsync(); }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception: {ex.Message}\n{ex.StackTrace}");
                 await tx.RollbackAsync();
-                throw;
+                return (null, $"Server error: {ex.Message}");
             }
         }
-
-        return (null, "Could not complete the request due to a concurrency conflict. Please try again.");
+        return (null, "Concurrency conflict. Please try again.");
     }
 
-    // ─── Pass ────────────────────────────────────────────────────────────────
+    // ─── Pass ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Driver explicitly passes on their current offer.
-    /// The shipment slides to the next available driver.
-    /// The passing driver becomes idle (eligible for the next available shipment).
-    /// </summary>
     public async Task<(bool success, string? error)> PassAsync(Guid queueItemId, Guid driverId)
     {
         var activeEvent = await _db.QueueEvents
@@ -225,48 +231,20 @@ public class ShipmentQueueService
             .FirstOrDefaultAsync(e => e.QueueEventId == activeEvent.Id && e.DriverId == driverId);
         if (entry == null) return (false, "You are not part of this queue event.");
 
-        if (entry.CurrentOfferedShipmentQueueId != queueItemId)
-            return (false, "That shipment is not your current offer.");
+        var slots = DeserialiseSlots(entry.ShipmentListJson);
+        var slotIdx = slots.FindIndex(s => s.ShipmentQueueId == queueItemId);
+        if (slotIdx < 0)                      return (false, "That shipment is not in your offer list.");
+        if (slotIdx >= entry.ClaimableCount)  return (false, "That shipment's window hasn't opened for you yet.");
+        if (slots[slotIdx].IsSkipped)         return (false, "Already passed.");
 
-        if (entry.OfferStatus != DriverOfferStatus.Pending)
-            return (false, $"Offer already resolved (status: {entry.OfferStatus}).");
-
-        // Mark the assignment as passed
-        var assignment = await _db.ShipmentQueueAssignments
-            .FirstOrDefaultAsync(a => a.QueueEventId    == activeEvent.Id
-                                   && a.ShipmentQueueId == queueItemId
-                                   && a.DriverId        == driverId
-                                   && a.Outcome         == AssignmentOutcome.Pending);
-        if (assignment != null)
-        {
-            assignment.Outcome = AssignmentOutcome.Passed;
-            await _db.SaveChangesAsync();
-        }
-
-        // Revert shipment to waiting so it can be re-offered
-        var shipment = await _db.ShipmentQueues.FindAsync(queueItemId);
-        if (shipment != null)
-        {
-            shipment.Status          = ShipmentQueueStatus.Waiting;
-            shipment.CurrentDriverId = null;
-            shipment.OfferExpiresAt  = null;
-            await _db.SaveChangesAsync();
-        }
-
-        // Clear driver's current offer so they become idle for the next available shipment
-        // Bug 4 fix: reset to Idle (not Passed) so AssignOffersAsync will re-match this driver
-        entry.CurrentOfferedShipmentQueueId = null;
-        entry.OfferStatus                   = DriverOfferStatus.Idle;
-        await _db.SaveChangesAsync();
-
-        // Bug 2 fix: use the injected QueueEventService instead of newing it with null! deps
-        await _queueEventService.AssignOffersAsync(activeEvent);
+        // Delegate all mutations to the service (updates lists for driver + next driver)
+        await _queueEventService.OnDriverPassedAsync(activeEvent.Id, driverId, queueItemId);
 
         await _hub.Clients.All.SendAsync("OfferUpdated", driverId);
         return (true, null);
     }
 
-    // ─── Mapping ─────────────────────────────────────────────────────────────
+    // ─── Mapping ──────────────────────────────────────────────────────────────
 
     private static ShipmentQueueDto ToDto(ShipmentQueue q) => new(
         q.Id, q.ShipmentId, q.Shipment.ShipmentNumber, q.ZoneId,
@@ -279,4 +257,16 @@ public class ShipmentQueueService
 
     private static string FormatAddress(Address? a) =>
         a == null ? "Unknown" : $"{a.City}, {a.State}";
+
+    private static List<DriverShipmentSlot> DeserialiseSlots(string json)
+    {
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<DriverShipmentSlot>>(
+                json, new System.Text.Json.JsonSerializerOptions
+                    { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase })
+                ?? new();
+        }
+        catch { return new(); }
+    }
 }

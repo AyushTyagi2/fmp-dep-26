@@ -17,21 +17,24 @@ public class DriverQueueEntryConfiguration : IEntityTypeConfiguration<DriverQueu
         builder.Property(e => e.Position).HasColumnName("position");
         builder.Property(e => e.ClaimWindowStart).HasColumnName("claim_window_start");
         builder.Property(e => e.ClaimWindowEnd).HasColumnName("claim_window_end");
-        builder.Property(e => e.HasClaimed).HasColumnName("has_claimed").HasDefaultValue(false);
+        builder.Property(e => e.HasClaimed)
+               .HasColumnName("has_claimed")
+               .HasDefaultValue(false);
 
-        // ── Parallel offer columns ──────────────────────────────────────────
-        builder.Property(e => e.CurrentOfferedShipmentQueueId)
-               .HasColumnName("current_offered_shipment_queue_id");
+        // ── New list model ────────────────────────────────────────────────────
+        builder.Property(e => e.ShipmentListJson)
+               .HasColumnName("shipment_list_json")
+               .HasColumnType("jsonb")
+               .HasDefaultValue("[]")
+               .IsRequired();
 
-        builder.Property(e => e.OfferStatus)
-               .HasColumnName("offer_status")
-               .HasMaxLength(20)
-               .HasDefaultValue(DriverOfferStatus.Idle);
+        builder.Property(e => e.ClaimableCount)
+               .HasColumnName("claimable_count")
+               .HasDefaultValue(0);
 
-        builder.HasOne(e => e.CurrentOfferedShipment)
-               .WithMany()
-               .HasForeignKey(e => e.CurrentOfferedShipmentQueueId)
-               .IsRequired(false)
-               .OnDelete(DeleteBehavior.SetNull);
+        // ── Removed columns (old single-offer tracking) ───────────────────────
+        // current_offered_shipment_queue_id  → dropped
+        // offer_status                       → dropped
+        // still_claimable_expires_at         → dropped (never needed with new model)
     }
 }

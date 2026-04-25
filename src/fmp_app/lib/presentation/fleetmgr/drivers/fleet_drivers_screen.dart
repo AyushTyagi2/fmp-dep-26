@@ -29,7 +29,7 @@ class _FleetDriversScreenState extends State<FleetDriversScreen> {
   }
 
   Future<void> _loadDrivers() async {
-    final phone = AppSession.phone;
+    final phone = AppSession.email;
     if (phone == null) return;
     setState(() => _loading = true);
     try {
@@ -51,33 +51,20 @@ class _FleetDriversScreenState extends State<FleetDriversScreen> {
     return Scaffold(
       backgroundColor: _kSurface,
       appBar: AppBar(
-        backgroundColor: _kNavy,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.people, size: 18, color: Colors.white),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Drivers',
-              style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.3),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadDrivers,
-          ),
-        ],
-      ),
+  backgroundColor: _kNavy,
+  foregroundColor: Colors.white,
+  elevation: 0,
+  title: const Text(
+    'Drivers',
+    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+  ),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.refresh, color: Colors.white),
+      onPressed: _loadDrivers,
+    ),
+  ],
+),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _kNavy))
           : state.drivers.isEmpty

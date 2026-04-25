@@ -54,5 +54,16 @@ public class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
               .HasForeignKey(e => e.DropAddressId)
               .HasConstraintName("fk_shipment_drop_address")
               .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(e => e.SenderOrganization)
+      .WithMany()
+      .HasForeignKey(e => e.SenderOrganizationId)
+      .HasConstraintName("fk_shipment_sender_org")
+      .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne(e => e.ReceiverOrganization)
+            .WithMany()
+            .HasForeignKey(e => e.ReceiverOrganizationId)
+            .HasConstraintName("fk_shipment_receiver_org")
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

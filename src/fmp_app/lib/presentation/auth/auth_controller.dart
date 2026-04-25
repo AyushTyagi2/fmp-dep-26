@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'auth_api.dart';
 import 'package:fmp_app/app_session.dart';
 
 enum AuthStage {
   idle,
-  phoneEntered,
+  emailEntered,
   otpSending,
   otpSent,
   verifyingOtp,
+  googleSigningIn,
   authenticated,
   error,
 }
@@ -20,7 +22,7 @@ class AuthController extends ChangeNotifier {
 
   AuthStage _stage = AuthStage.idle;
 
-  String? phone;
+  String? email;
   String? errorMessage;
 
   int _secondsLeft = 0;
@@ -29,22 +31,129 @@ class AuthController extends ChangeNotifier {
   AuthStage get stage => _stage;
   int get secondsLeft => _secondsLeft;
 
-  void setPhone(String value) {
-    phone = value;
-    _stage = AuthStage.phoneEntered;
+  // ── Email / OTP methods (unchanged) ──────────────────────────────────────
+
+  void setEmail(String value) {
+    email = value;
+    _stage = AuthStage.emailEntered;
     notifyListeners();
   }
 
+  Future<void> sendOtp() async {
+    if (email == null || email!.isEmpty) {
+      _setError('Email address missing');
+      return;
+    }
+
+    _stage = AuthStage.otpSending;
+    notifyListeners();
+
+    try {
+      await _authApi.requestOtp(email!);
+      _startTimer();
+      _stage = AuthStage.otpSent;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error sending OTP: $e');
+      _setError('Failed to send OTP');
+    }
+  }
+
+  Future<void> verifyOtp(String otp) async {
+    if (otp.length < 4) {
+      _setError('Invalid OTP');
+      return;
+    }
+
+    _stage = AuthStage.verifyingOtp;
+    notifyListeners();
+
+    try {
+      await _authApi.verifyOtp(email!, otp);
+      _stopTimer();
+      _stage = AuthStage.authenticated;
+      AppSession.email = email;
+      notifyListeners();
+    } catch (e) {
+      _setError('Incorrect or expired OTP!');
+    }
+  }
+
+  // ── Google Sign-In ────────────────────────────────────────────────────────
+
+  /// Signs in with Google, sends the ID token to the backend, then
+  /// routes the user exactly the same way as the OTP flow does.
+  Future<void> signInWithGoogle(BuildContext context) async {
+    _stage = AuthStage.googleSigningIn;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final googleSignIn = GoogleSignIn(
+        // Use your Web OAuth 2.0 Client ID from Google Cloud Console.
+        // Required even on Android/iOS so the backend can validate the token.
+        clientId: '696087235103-3r077jlu3810j9o1i2habbessdee2eu8.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+
+      // Ensure a fresh sign-in (avoids stale cached accounts)
+      await googleSignIn.signOut();
+      final googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User dismissed the picker
+        _stage = AuthStage.idle;
+        notifyListeners();
+        return;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        _setError('Google sign-in failed: no ID token');
+        return;
+      }
+
+      // Send to backend — returns { email, token, driverId }
+      final res = await _authApi.signInWithGoogle(idToken);
+
+      email = res['email'] as String;
+
+      await AppSession.save(
+        email: email!,
+        token: res['token'] as String,
+        driverId: res['driverId'] as String?,
+        role: '',
+      );
+
+      _stage = AuthStage.authenticated;
+      notifyListeners();
+
+      if (!context.mounted) return;
+
+      // Reuse the same auto-routing logic as the OTP flow
+      final autoRouted = await tryAutoRoute(context);
+      if (!autoRouted && context.mounted) {
+        Navigator.pushReplacementNamed(context, '/role-selection');
+      }
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+      _setError('Google sign-in failed. Please try again.');
+    }
+  }
+
+  // ── Shared routing logic ──────────────────────────────────────────────────
+
   Future<void> chooseRole(BuildContext context, String role) async {
     try {
-      final res = await _authApi.resolveRole(phone!, role);
+      final res = await _authApi.resolveRole(email!, role);
 
-      // Save session including the chosen role
       await AppSession.save(
-        phone:    phone!,
-        token:    res['token'] as String,
+        email: email!,
+        token: res['token'] as String,
         driverId: res['driverId'] as String?,
-        role:     role,
+        role: role,
       );
 
       final screen = res['screen'];
@@ -76,6 +185,9 @@ class AuthController extends ChangeNotifier {
         case 'union_dashboard':
           Navigator.pushReplacementNamed(context, '/union-dashboard');
           break;
+        case 'unauthorized':
+          _setError('You do not have permission to access this role');
+          break;
         default:
           final msg = 'Unexpected navigation target: $screen';
           try {
@@ -84,80 +196,39 @@ class AuthController extends ChangeNotifier {
           } catch (_) {
             debugPrint(msg);
           }
-          debugPrint('Auth.chooseRole received unexpected screen: $screen');
       }
     } catch (e) {
       _setError('Failed to resolve role');
     }
   }
 
-    Future<bool> tryAutoRoute(BuildContext context) async {
-  try {
-    for (final role in ['SUPER_ADMIN', 'UNION_MANAGER']) {
-      final res = await _authApi.resolveRole(phone!, role);
-      final screen = res['screen'] as String?;
-      debugPrint('tryAutoRoute: role=$role, screen=$screen');
+  Future<bool> tryAutoRoute(BuildContext context) async {
+    try {
+      for (final role in ['SUPER_ADMIN', 'UNION_MANAGER']) {
+        final res = await _authApi.resolveRole(email!, role);
+        final screen = res['screen'] as String?;
+        debugPrint('tryAutoRoute: role=$role, screen=$screen');
 
-      if (screen == 'admin_dashboard' || screen == 'union_dashboard') {
-        await AppSession.save(
-          phone: phone!,
-          token: res['token'] as String,
-          driverId: null,
-          role: role,
-        );
-        if (!context.mounted) return false;
-        Navigator.pushReplacementNamed(
-          context,
-          screen == 'admin_dashboard' ? '/system_admin' : '/union-dashboard',
-        );
-        return true;
+        if (screen == 'admin_dashboard' || screen == 'union_dashboard') {
+          await AppSession.save(
+            email: email!,
+            token: res['token'] as String,
+            driverId: null,
+            role: role,
+          );
+          if (!context.mounted) return false;
+          Navigator.pushReplacementNamed(
+            context,
+            screen == 'admin_dashboard' ? '/system_admin' : '/union-dashboard',
+          );
+          return true;
+        }
       }
-      // 'unauthorized' or anything else → continue loop
-    }
-  } catch (_) {}
-  return false;
-}
-
-
-  Future<void> sendOtp() async {
-    if (phone == null || phone!.isEmpty) {
-      _setError('Phone number missing');
-      return;
-    }
-
-    _stage = AuthStage.otpSending;
-    notifyListeners();
-
-    try {
-      await _authApi.requestOtp(phone!);
-      _startTimer();
-      _stage = AuthStage.otpSent;
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error sending OTP: $e');
-      _setError('Failed to send OTP');
-    }
+    } catch (_) {}
+    return false;
   }
 
-  Future<void> verifyOtp(String otp) async {
-    if (otp.length < 4) {
-      _setError('Invalid OTP');
-      return;
-    }
-
-    _stage = AuthStage.verifyingOtp;
-    notifyListeners();
-
-    try {
-      await _authApi.verifyOtp(phone!, otp);
-      _stopTimer();
-      _stage = AuthStage.authenticated;
-      AppSession.phone = phone;
-      notifyListeners();
-    } catch (e) {
-      _setError('Incorrect or expired OTP!');
-    }
-  }
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   void _startTimer() {
     _secondsLeft = 120;
@@ -185,7 +256,7 @@ class AuthController extends ChangeNotifier {
   }
 
   void reset() {
-    phone = null;
+    email = null;
     errorMessage = null;
     _stopTimer();
     _stage = AuthStage.idle;

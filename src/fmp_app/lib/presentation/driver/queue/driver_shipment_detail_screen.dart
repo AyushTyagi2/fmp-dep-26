@@ -34,7 +34,7 @@ class _DriverShipmentDetailScreenState extends State<DriverShipmentDetailScreen>
     debugPrint('=== SESSION DEBUG ===');
     debugPrint('driverId: ${AppSession.driverId}');
     debugPrint('token: ${AppSession.token}');
-    debugPrint('phone: ${AppSession.phone}');
+    debugPrint('phone: ${AppSession.email}');  // was phone, now email
     debugPrint('====================');
 
     if (widget.driverId.isEmpty) {

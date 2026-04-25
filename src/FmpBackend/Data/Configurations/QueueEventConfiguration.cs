@@ -13,9 +13,18 @@ public class QueueEventConfiguration : IEntityTypeConfiguration<QueueEvent>
 
         builder.Property(e => e.Id).HasColumnName("id");
         builder.Property(e => e.ZoneId).HasColumnName("zone_id");
-        builder.Property(e => e.StartTime).HasColumnName("start_time");
-        builder.Property(e => e.EndTime).HasColumnName("end_time");
         builder.Property(e => e.WindowSeconds).HasColumnName("window_seconds");
         builder.Property(e => e.Status).HasColumnName("status").HasMaxLength(20).HasDefaultValue("live");
+
+        // Previously missing: without HasColumnName, EF quoted the C# property
+        // name verbatim ("EndTime", "StartTime") instead of the snake_case column
+        // names Postgres actually has (end_time, start_time) -> 42703 column error.
+        builder.Property(e => e.StartTime)
+            .HasColumnName("start_time")
+            .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+        builder.Property(e => e.EndTime)
+            .HasColumnName("end_time")
+            .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
     }
 }

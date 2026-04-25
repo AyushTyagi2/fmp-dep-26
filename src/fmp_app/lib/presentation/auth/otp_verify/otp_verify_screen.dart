@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../auth_controller.dart';
 
-// ── SAME LOGIC, REDESIGNED UI ─────────────────────────────────────────────────
 // lib/presentation/auth/otp_verify/otp_verify_screen.dart
-// Routing, controller calls, and timer logic unchanged.
-// Added: proper 6-box OTP UI, countdown timer display, resend action.
 
 class OtpVerifyScreen extends StatefulWidget {
   const OtpVerifyScreen({super.key});
@@ -16,7 +13,6 @@ class OtpVerifyScreen extends StatefulWidget {
 
 class _OtpVerifyScreenState extends State<OtpVerifyScreen>
     with SingleTickerProviderStateMixin {
-  // One controller per digit box (6 boxes)
   final List<TextEditingController> _digitCtrls =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes =
@@ -25,10 +21,6 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
   late AnimationController _animCtrl;
   late Animation<double>    _fadeAnim;
   late Animation<Offset>    _slideAnim;
-
-  // ── UNCHANGED LOGIC ──────────────────────────────────────────────────────────
-  // Navigation happens via WidgetsBinding callback (original pattern preserved)
-  // ─────────────────────────────────────────────────────────────────────────────
 
   String get _otpValue => _digitCtrls.map((c) => c.text).join();
 
@@ -56,7 +48,6 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
   }
 
   void _onDigitChanged(int index, String value) {
-    // Handle paste (e.g. from SMS autofill)
     if (value.length > 1) {
       final digits = value.replaceAll(RegExp(r'\D'), '');
       for (int i = 0; i < 6 && i < digits.length; i++) {
@@ -77,32 +68,28 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
     }
   }
 
-  // ── UNCHANGED: calls auth.verifyOtp exactly as original ──────────────────────
   void _tryVerify() {
     final auth = context.read<AuthController>();
     auth.verifyOtp(_otpValue);
   }
 
   String _formatSeconds(int s) {
-    final m = (s ~/ 60).toString().padLeft(2, '0');
+    final m   = (s ~/ 60).toString().padLeft(2, '0');
     final sec = (s % 60).toString().padLeft(2, '0');
     return '$m:$sec';
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
 
-    // ── UNCHANGED: navigation callback from original screen ───────────────────
-     WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (auth.stage == AuthStage.authenticated) {
         final autoRouted = await auth.tryAutoRoute(context);
         if (!autoRouted && context.mounted) {
           Navigator.pushReplacementNamed(context, '/role-selection');
         }
-}
+      }
     });
 
     final isVerifying = auth.stage == AuthStage.verifyingOtp;
@@ -110,7 +97,6 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      // ── Custom back button (same nav behaviour as AppBar back) ─────────────
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -135,23 +121,18 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
 
                   // ── Icon ───────────────────────────────────────────────────
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 60, height: 60,
                     decoration: BoxDecoration(
                       color: const Color(0xFFEBF0FE),
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Icon(
-                      Icons.lock_outline_rounded,
-                      size: 30,
-                      color: Color(0xFF1A56DB),
-                    ),
+                    child: const Icon(Icons.mark_email_read_outlined, size: 30, color: Color(0xFF1A56DB)),
                   ),
                   const SizedBox(height: 24),
 
                   // ── Headline ───────────────────────────────────────────────
                   const Text(
-                    'Verify OTP',
+                    'Check your email',
                     style: TextStyle(
                       fontSize: 30, fontWeight: FontWeight.w800,
                       color: Color(0xFF111827), letterSpacing: -0.5,
@@ -160,13 +141,11 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
                   const SizedBox(height: 6),
                   RichText(
                     text: TextSpan(
-                      style: const TextStyle(
-                        fontSize: 15, color: Color(0xFF6B7280), height: 1.5,
-                      ),
+                      style: const TextStyle(fontSize: 15, color: Color(0xFF6B7280), height: 1.5),
                       children: [
-                        const TextSpan(text: 'A 6-digit code was sent to '),
+                        const TextSpan(text: 'We sent a 6-digit code to '),
                         TextSpan(
-                          text: '+91 ${auth.phone ?? ''}',
+                          text: auth.email ?? '',
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF111827),
@@ -218,8 +197,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
                       ),
                       child: isVerifying
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
+                              width: 20, height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -227,10 +205,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
                             )
                           : const Text(
                               'Verify & Continue',
-                              style: TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
                             ),
                     ),
                   ),
@@ -242,38 +217,34 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
                         ? Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.timer_outlined,
-                                size: 15,
-                                color: Color(0xFF6B7280),
-                              ),
+                              const Icon(Icons.timer_outlined, size: 15, color: Color(0xFF6B7280)),
                               const SizedBox(width: 6),
                               Text(
-                                'Resend OTP in ${_formatSeconds(auth.secondsLeft)}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF6B7280),
-                                ),
+                                'Resend code in ${_formatSeconds(auth.secondsLeft)}',
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
                               ),
                             ],
                           )
                         : TextButton(
                             onPressed: () {
-                              // Reset digit fields
                               for (final c in _digitCtrls) c.clear();
                               _focusNodes[0].requestFocus();
-                              // Re-use existing sendOtp logic from controller
                               context.read<AuthController>().sendOtp();
                             },
                             child: const Text(
-                              "Didn't receive it? Resend OTP",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF1A56DB),
-                              ),
+                              "Didn't receive it? Resend code",
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1A56DB)),
                             ),
                           ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Spam hint ──────────────────────────────────────────────
+                  Center(
+                    child: Text(
+                      'Check your spam folder if you don\'t see it',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                    ),
                   ),
                   const SizedBox(height: 32),
                 ],
@@ -300,9 +271,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                fontSize: 13, color: Color(0xFFE02424), height: 1.4,
-              ),
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE02424), height: 1.4),
             ),
           ),
         ],
@@ -364,8 +333,7 @@ class _DigitBoxState extends State<_DigitBox> {
     }
 
     return SizedBox(
-      width: 46,
-      height: 56,
+      width: 46, height: 56,
       child: KeyboardListener(
         focusNode: FocusNode(),
         onKeyEvent: (e) {
