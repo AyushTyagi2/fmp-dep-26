@@ -3,6 +3,7 @@ import '../../core/network/api_client.dart';
 import '../../core/models/driver.dart';
 import '../../core/models/fleet_dashboard.dart';
 import '../../core/models/vehicle.dart';
+import '../../core/models/trip.dart';
 
 class FleetApi {
   final Dio _dio;
@@ -63,4 +64,17 @@ class FleetApi {
       data: {'vehicleIds': vehicleIds},
     );
   }
+  Future<List<Trip>> getTripsByFleetOwnerPhone(String phone) async {
+  final encoded = Uri.encodeComponent(phone);
+  try {
+    final res = await _dio.get('/trips/fleetowners/phone/$encoded/trips');
+    final data = res.data as List<dynamic>;
+    return data
+        .map((e) => Trip.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) return [];
+    rethrow;
+  }
+}
 }

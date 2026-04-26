@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../core/models/vehicle.dart';
 import 'fleet_api.dart';
+import '../../core/models/trip.dart';
 
 class FleetState extends ChangeNotifier {
   bool isLoading = false;
@@ -8,7 +9,7 @@ class FleetState extends ChangeNotifier {
 
   List<dynamic> drivers = [];
   List<Vehicle> vehicles = [];
-  List<dynamic> trips = [];
+  List<Trip> trips = [];
 
   Future<void> loadData() async {
     isLoading = true;
@@ -123,4 +124,17 @@ class FleetState extends ChangeNotifier {
   void updateVehicle(dynamic vehicle) {
     notifyListeners();
   }
+  Future<void> loadTrips(String phone) async {
+  isLoading = true;
+  notifyListeners();
+  try {
+    trips = await _api.getTripsByFleetOwnerPhone(phone);
+  } catch (e) {
+    debugPrint("Error loading trips: $e");
+    trips = [];
+  } finally {
+    isLoading = false;
+    notifyListeners();
+  }
+}
 }
