@@ -54,6 +54,7 @@ class _FleetDriversScreenState extends State<FleetDriversScreen> {
   backgroundColor: _kNavy,
   foregroundColor: Colors.white,
   elevation: 0,
+  automaticallyImplyLeading: false,
   title: const Text(
     'Drivers',
     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),

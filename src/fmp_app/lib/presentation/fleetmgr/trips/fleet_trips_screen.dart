@@ -6,7 +6,10 @@ class FleetTripsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trips')),
+      appBar: AppBar(title: const Text('Trips'),
+      
+  automaticallyImplyLeading: false,
+  ),
       body: const Center(child: Text('Fleet trips history and management')),
     );
   }
