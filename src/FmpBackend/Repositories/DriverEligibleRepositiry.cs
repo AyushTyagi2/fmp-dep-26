@@ -12,7 +12,7 @@ public class DriverEligibleRepository
         _db = db;
     }
 
-    public async Task<List<Driver>> GetEligibleDriversAsync(string priorityRule = "highest_trips")
+    public IQueryable<Driver> GetEligibleDriversQuery(string priorityRule = "highest_trips")
     {
         var query = _db.Drivers
             .Where(d =>
@@ -39,6 +39,11 @@ public class DriverEligibleRepository
             query = query.OrderByDescending(d => d.TotalTripsCompleted);
         }
 
-        return await query.ToListAsync();
+        return query;
+    }
+
+    public async Task<List<Driver>> GetEligibleDriversAsync(string priorityRule = "highest_trips")
+    {
+        return await GetEligibleDriversQuery(priorityRule).ToListAsync();
     }
 }

@@ -453,6 +453,17 @@ class ShipmentApiService {
     return res.data as Map<String, dynamic>;
   }
 
+  Future<List<DriverPreview>> fetchDriverPreview(String rule) async {
+    try {
+      final res = await _dio.get('/api/queue-events/preview-drivers', queryParameters: {'rule': rule});
+      final list = res.data as List;
+      return list.map((e) => DriverPreview.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[fetchDriverPreview] failed: $e');
+      return [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getAllQueueEvents() async {
     final res  = await _dio.get('/api/queue-events');
     final data = res.data;
@@ -461,5 +472,31 @@ class ShipmentApiService {
       return (data['items'] as List).cast<Map<String, dynamic>>();
     }
     return [];
+  }
+}
+
+class DriverPreview {
+  final String driverId;
+  final String fullName;
+  final int? age;
+  final int totalTripsCompleted;
+  final DateTime? lastTripDate;
+
+  DriverPreview({
+    required this.driverId,
+    required this.fullName,
+    this.age,
+    required this.totalTripsCompleted,
+    this.lastTripDate,
+  });
+
+  factory DriverPreview.fromJson(Map<String, dynamic> json) {
+    return DriverPreview(
+      driverId: json['driverId'] as String,
+      fullName: json['fullName'] as String,
+      age: json['age'] as int?,
+      totalTripsCompleted: json['totalTripsCompleted'] as int? ?? 0,
+      lastTripDate: json['lastTripDate'] != null ? DateTime.tryParse(json['lastTripDate']) : null,
+    );
   }
 }

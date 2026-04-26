@@ -29,6 +29,36 @@ public class QueueEventService
         _db              = db;
     }
 
+    // ─── Driver Preview ───────────────────────────────────────────────────────
+
+    public async Task<List<DriverPreviewDto>> GetDriverPreviewAsync(string priorityRule)
+    {
+        var query = _driverRepo.GetEligibleDriversQuery(priorityRule);
+
+        // Fetch basic data from DB, evaluate age in-memory to prevent EF translation issues
+        var rawData = await query
+            .Select(d => new {
+                DriverId = d.Id,
+                FullName = _db.Users.Where(u => u.Id == d.UserId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown Driver",
+                DateOfBirth = _db.Users.Where(u => u.Id == d.UserId).Select(u => u.DateOfBirth).FirstOrDefault(),
+                TotalTrips = d.TotalTripsCompleted,
+                LastTripDate = _db.Trips.Where(t => t.DriverId == d.Id && t.CompletedAt != null).Max(t => t.CompletedAt)
+            })
+            .ToListAsync();
+
+        var driverPreviewList = rawData.Select(x => new DriverPreviewDto(
+            x.DriverId,
+            x.FullName,
+            x.DateOfBirth.HasValue 
+                ? (int)Math.Floor((DateTime.UtcNow - x.DateOfBirth.Value).TotalDays / 365.25)
+                : null,
+            x.TotalTrips,
+            x.LastTripDate
+        )).ToList();
+
+        return driverPreviewList;
+    }
+
     // ─── Create event ─────────────────────────────────────────────────────────
 
     public async Task<(QueueEvent? Event, string? ConflictMessage)> CreateQueueEventAsync(CreateQueueEventRequest request)
