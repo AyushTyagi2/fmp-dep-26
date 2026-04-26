@@ -69,12 +69,15 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('📱 Verifying OTP for email: $email, otp: $otp');
       await _authApi.verifyOtp(email!, otp);
+      debugPrint('✓ OTP verified successfully');
       _stopTimer();
       _stage = AuthStage.authenticated;
       AppSession.email = email;
       notifyListeners();
     } catch (e) {
+      debugPrint('✗ OTP verification failed: $e');
       _setError('Incorrect or expired OTP!');
     }
   }
@@ -115,8 +118,10 @@ class AuthController extends ChangeNotifier {
         return;
       }
 
+      debugPrint('🔵 Google sign-in successful, sending to backend...');
       // Send to backend — returns { email, token, driverId }
       final res = await _authApi.signInWithGoogle(idToken);
+      debugPrint('✓ Backend Google auth response: $res');
 
       email = res['email'] as String;
 
@@ -135,10 +140,11 @@ class AuthController extends ChangeNotifier {
       // Reuse the same auto-routing logic as the OTP flow
       final autoRouted = await tryAutoRoute(context);
       if (!autoRouted && context.mounted) {
+        debugPrint('⚠ Auto-route failed, sending to /role-selection');
         Navigator.pushReplacementNamed(context, '/role-selection');
       }
     } catch (e) {
-      debugPrint('Google sign-in error: $e');
+      debugPrint('✗ Google sign-in error: $e');
       _setError('Google sign-in failed. Please try again.');
     }
   }
@@ -147,7 +153,9 @@ class AuthController extends ChangeNotifier {
 
   Future<void> chooseRole(BuildContext context, String role) async {
     try {
+      debugPrint('🔑 User selected role: $role for email: $email');
       final res = await _authApi.resolveRole(email!, role);
+      debugPrint('✓ Role resolution response: $res');
 
       await AppSession.save(
         email: email!,
@@ -157,37 +165,47 @@ class AuthController extends ChangeNotifier {
       );
 
       final screen = res['screen'];
+      debugPrint('→ Resolved screen: $screen');
 
       if (!context.mounted) return;
 
       switch (screen) {
         case 'driver_dashboard':
+          debugPrint('  → Navigating to: /driver-dashboard');
           Navigator.pushReplacementNamed(context, '/driver-dashboard');
           break;
         case 'driver_onboarding':
+          debugPrint('  → Navigating to: /driver-basic');
           Navigator.pushReplacementNamed(context, '/driver-basic');
           break;
         case 'sender_dashboard':
+          debugPrint('  → Navigating to: /organizationuser');
           Navigator.pushReplacementNamed(context, '/organizationuser');
           break;
         case 'sender_onboarding':
+          debugPrint('  → Navigating to: /sender-onboarding');
           Navigator.pushReplacementNamed(context, '/sender-onboarding');
           break;
         
         case 'fleet_onboarding':
+          debugPrint('  → Navigating to: /fleet-onboarding');
           Navigator.pushReplacementNamed(context, '/fleet-onboarding');
           break;
         case 'admin_dashboard':
+          debugPrint('  → Navigating to: /system_admin');
           Navigator.pushReplacementNamed(context, '/system_admin');
           break;
         case 'union_dashboard':
+          debugPrint('  → Navigating to: /union-dashboard');
           Navigator.pushReplacementNamed(context, '/union-dashboard');
           break;
         case 'unauthorized':
+          debugPrint('  ✗ Unauthorized for role: $role');
           _setError('You do not have permission to access this role');
           break;
         default:
           final msg = 'Unexpected navigation target: $screen';
+          debugPrint('  ✗ $msg');
           try {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text(msg)));
@@ -196,40 +214,59 @@ class AuthController extends ChangeNotifier {
           }
       }
     } catch (e) {
+      debugPrint('✗ Error in chooseRole: $e');
       _setError('Failed to resolve role');
     }
   }
 
   Future<bool> tryAutoRoute(BuildContext context) async {
+  debugPrint('=== START tryAutoRoute for email: $email ===');
   try {
-    for (final role in ['SUPER_ADMIN', 'UNION_MANAGER', 'FLEET_MANAGER']) {
-      final res = await _authApi.resolveRole(email!, role);
-      final screen = res['screen'] as String?;
-      debugPrint('tryAutoRoute: role=$role, screen=$screen');
+    for (final role in ['SUPER_ADMIN', 'UNION_MANAGER', 'FLEET_OWNER']) {
+      debugPrint('→ Attempting role: $role');
+      try {
+        final res = await _authApi.resolveRole(email!, role);
+        final screen = res['screen'] as String?;
+        debugPrint('  ✓ Response received: screen="$screen"');
+        debugPrint('  ✓ Full response: $res');
 
-      if (screen == 'admin_dashboard' || 
-          screen == 'union_dashboard' ||
-          screen == 'fleet_dashboard') {
-        await AppSession.save(
-          email: email!,
-          token: res['token'] as String,
-          driverId: null,
-          role: role,
-        );
-        if (!context.mounted) return false;
+        if (screen == 'admin_dashboard' || 
+            screen == 'union_dashboard' ||
+            screen == 'fleet_dashboard' ||
+            screen == 'fleet_onboarding' ||
+            screen == 'unknown') {
+          debugPrint('  ✓ Screen matched! Route condition: TRUE');
+          await AppSession.save(
+            email: email!,
+            token: res['token'] as String,
+            driverId: null,
+            role: role,
+          );
+          if (!context.mounted) return false;
 
-        final route = switch (screen) {
-          'admin_dashboard' => '/system_admin',
-          'union_dashboard' => '/union-dashboard',
-          'fleet_dashboard' => '/fleet-dashboard',
-          _ => '/role-selection',
-        };
+          final route = switch (screen) {
+            'admin_dashboard' => '/system_admin',
+            'union_dashboard' => '/union-dashboard',
+            'fleet_dashboard' => '/fleet-dashboard',
+            'fleet_onboarding' => '/fleet-onboarding',
+            'unknown' => '/role-selection',
+            _ => '/role-selection',
+          };
 
-        Navigator.pushReplacementNamed(context, route);
-        return true;
+          debugPrint('  ✓ Navigating to: $route');
+          Navigator.pushReplacementNamed(context, route);
+          return true;
+        } else {
+          debugPrint('  ✗ Screen did NOT match. screen="$screen"');
+        }
+      } catch (e) {
+        debugPrint('  ✗ Error resolving role $role: $e');
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('✗ CRITICAL ERROR in tryAutoRoute: $e');
+  }
+  debugPrint('=== END tryAutoRoute: No auto-route matched, returning false ===');
   return false;
 }
   // ── Helpers ───────────────────────────────────────────────────────────────

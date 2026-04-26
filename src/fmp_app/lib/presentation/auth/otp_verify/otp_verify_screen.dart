@@ -85,9 +85,13 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (auth.stage == AuthStage.authenticated) {
+        debugPrint('🔄 OTP verified, attempting auto-route...');
         final autoRouted = await auth.tryAutoRoute(context);
         if (!autoRouted && context.mounted) {
+          debugPrint('⚠ Auto-route returned false, sending to /role-selection');
           Navigator.pushReplacementNamed(context, '/role-selection');
+        } else if (autoRouted) {
+          debugPrint('✓ Auto-route successful');
         }
       }
     });

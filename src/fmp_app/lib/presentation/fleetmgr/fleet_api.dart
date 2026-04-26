@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import '../../core/network/api_client.dart';
 import '../../core/models/driver.dart';
 import '../../core/models/fleet_dashboard.dart';
+import '../../core/models/vehicle.dart';
+import '../../core/models/trip.dart';
 
 class FleetApi {
   final Dio _dio;
@@ -30,4 +32,49 @@ class FleetApi {
     final res = await _dio.get('/drivers/fleetowners/phone/$encoded/dashboard');
     return FleetDashboard.fromJson(Map<String, dynamic>.from(res.data));
   }
+
+  Future<List<Vehicle>> getVehiclesByFleetOwnerPhone(String phone) async {
+    final encoded = Uri.encodeComponent(phone);
+    try {
+      final res = await _dio.get('/vehicles/fleetowners/phone/$encoded/vehicles');
+      final data = res.data as List<dynamic>;
+      return data.map((e) => Vehicle.fromJson(Map<String, dynamic>.from(e))).toList();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return [];
+      rethrow;
+    }
+  }
+
+  Future<Vehicle> addVehicle(String phone, Map<String, dynamic> vehicleData) async {
+    final encoded = Uri.encodeComponent(phone);
+    final res = await _dio.post('/vehicles/fleetowners/phone/$encoded/vehicles', data: vehicleData);
+    return Vehicle.fromJson(Map<String, dynamic>.from(res.data));
+  }
+
+  Future<Map<String, dynamic>> addVehiclesBulk(String phone, List<Map<String, dynamic>> vehicles) async {
+    final encoded = Uri.encodeComponent(phone);
+    final res = await _dio.post('/vehicles/fleetowners/phone/$encoded/vehicles/bulk', data: vehicles);
+    return Map<String, dynamic>.from(res.data);
+  }
+
+  Future<void> dropVehicles(String phone, List<String> vehicleIds) async {
+    final encoded = Uri.encodeComponent(phone);
+    await _dio.delete(
+      '/vehicles/fleetowners/phone/$encoded/vehicles',
+      data: {'vehicleIds': vehicleIds},
+    );
+  }
+  Future<List<Trip>> getTripsByFleetOwnerPhone(String phone) async {
+  final encoded = Uri.encodeComponent(phone);
+  try {
+    final res = await _dio.get('/trips/fleetowners/phone/$encoded/trips');
+    final data = res.data as List<dynamic>;
+    return data
+        .map((e) => Trip.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) return [];
+    rethrow;
+  }
+}
 }

@@ -1,55 +1,44 @@
-using FmpBackend.Dtos;
-using FmpBackend.Services;
+using FmpBackend.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FmpBackend.Controllers;
 
 [ApiController]
-[Route("api/trips")]
+[Route("trips")]
 public class TripsController : ControllerBase
 {
-    private readonly TripService _svc;
-    public TripsController(TripService svc) => _svc = svc;
+    private readonly IFleetTripService _fleetTripService;
+    private readonly ILogger<TripsController> _logger;
 
-    [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int page=1, [FromQuery] int pageSize=20, [FromQuery] string? status=null)
-        => Ok(await _svc.GetAllAsync(page, pageSize, status));
-
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id)
+    public TripsController(IFleetTripService fleetTripService, ILogger<TripsController> logger)
     {
-        var trip = await _svc.GetByIdAsync(id);
-        return trip == null ? NotFound() : Ok(trip);
+        _fleetTripService = fleetTripService;
+        _logger           = logger;
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateTripRequest req)
+    [HttpGet("fleetowners/phone/{phone}/trips")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTripsByFleetOwnerPhone(
+        [FromRoute] string phone,
+        CancellationToken ct)
     {
-        var result = await _svc.CreateAsync(req);
-        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-    }
-
-    [HttpPatch("{id:guid}/status")]
-    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateTripStatusRequest req)
-    {
-        var ok = await _svc.UpdateStatusAsync(id, req);
-        return ok ? NoContent() : NotFound();
-    }
-
-    [HttpGet("driver/{driverId:guid}")]
-    public async Task<IActionResult> GetByDriver(Guid driverId)
-        => Ok(await _svc.GetByDriverAsync(driverId));
-
-    /// <summary>
-    /// Driver trip search — GET /api/trips/search?driverId=&amp;q=&amp;status=
-    /// </summary>
-    [HttpGet("search")]
-    public async Task<IActionResult> SearchTrips(
-        [FromQuery] Guid driverId,
-        [FromQuery] string? q = null,
-        [FromQuery] string? status = null)
-    {
-        var result = await _svc.SearchByDriverAsync(driverId, q, status);
-        return Ok(result);
+        var decoded = Uri.UnescapeDataString(phone);
+        try
+        {
+            var trips = await _fleetTripService.GetTripsByFleetOwnerPhoneAsync(decoded, ct);
+            return Ok(trips);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning("Fleet owner not found: {Message}", ex.Message);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error fetching trips for phone {Phone}", decoded);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { message = "An unexpected error occurred." });
+        }
     }
 }

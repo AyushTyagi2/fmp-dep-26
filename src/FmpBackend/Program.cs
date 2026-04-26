@@ -8,7 +8,8 @@ using FmpBackend.Services;
 using FmpBackend.Workers;
 using FmpBackend.Middleware;
 using System.Text.Json.Serialization;
-
+using FmpBackend.Repositories.Interfaces;
+using FmpBackend.Services.Interfaces;
 //AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -75,9 +76,12 @@ builder.Services.AddScoped<QueueEventService>();
 builder.Services.AddScoped<SystemLogRepository>();
 builder.Services.AddScoped<SystemLogService>();
 builder.Services.AddScoped<SysAdminService>();
+builder.Services.AddScoped<VehicleService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddHostedService<QueueMaintenanceWorker>();
-
+builder.Services.AddScoped<ITripRepository, TripRepository>();
+builder.Services.AddScoped<IFleetTripService, FleetTripService>();
+ 
 // ── NO second AddControllers() here ──────────────────────────────────────────
 
 var app = builder.Build();
