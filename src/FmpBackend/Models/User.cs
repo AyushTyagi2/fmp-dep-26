@@ -10,4 +10,5 @@ public class User
     public string? AuthProvider   { get; set; }           // "email_otp" | "google"
     public string? AuthProviderId { get; set; }           // Google "sub" value
     public DateTime CreatedAt     { get; set; }
+    public DateTime? DateOfBirth  { get; set; }
 }

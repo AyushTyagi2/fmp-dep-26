@@ -42,26 +42,35 @@ class TripSummary {
     this.deliveredToName,
   });
 
-  factory TripSummary.fromJson(Map<String, dynamic> json) => TripSummary(
-    id:                   json['id']             as String,
-    tripNumber:           json['tripNumber']     as String,
-    shipmentId:           json['shipmentId']     as String,
-    shipmentNumber:       json['shipmentNumber'] as String,
-    currentStatus:        json['currentStatus']  as String,
-    agreedPrice:          (json['agreedPrice']   as num?)?.toDouble(),
-    createdAt:            DateTime.parse(json['createdAt'] as String),
-    senderName:           json['senderName']     ?? '',
-    receiverName:         json['receiverName']   ?? '',
-    plannedStartTime:     json['plannedStartTime']  != null ? DateTime.parse(json['plannedStartTime']) : null,
-    plannedEndTime:       json['plannedEndTime']    != null ? DateTime.parse(json['plannedEndTime'])   : null,
-    actualStartTime:      json['actualStartTime']   != null ? DateTime.parse(json['actualStartTime'])  : null,
-    deliveredAt:          json['deliveredAt']       != null ? DateTime.parse(json['deliveredAt'])       : null,
-    driverPaymentAmount:  (json['driverPaymentAmount'] as num?)?.toDouble(),
-    driverPaymentStatus:  json['driverPaymentStatus'] ?? 'pending',
-    hasIssues:            json['hasIssues']      ?? false,
-    issueDescription:     json['issueDescription'] as String?,
-    deliveredToName:      json['deliveredToName']   as String?,
+factory TripSummary.fromJson(Map<String, dynamic> json) {
+  print('>>> RAW TRIP JSON: $json'); // remove after debugging
+  return TripSummary(
+    id:                  (json['id']                  as String?) ?? '',
+    tripNumber:          (json['tripNumber']           as String?) ?? '',
+    shipmentId:          (json['shipmentId']           as String?) ?? '',
+    shipmentNumber:      (json['shipmentNumber']       as String?) ?? '',
+    currentStatus:       (json['currentStatus']        as String?) ?? 'unknown',
+    agreedPrice:         (json['driverPaymentAmount']  as num?)?.toDouble(),
+    createdAt:           json['createdAt'] != null
+                           ? DateTime.parse(json['createdAt'] as String)
+                           : DateTime.now(),
+    senderName:          (json['senderName']           as String?) ?? '',
+    receiverName:        (json['receiverName']         as String?) ?? '',
+    plannedStartTime:    json['plannedStartTime']  != null
+                           ? DateTime.parse(json['plannedStartTime'] as String) : null,
+    plannedEndTime:      json['plannedEndTime']    != null
+                           ? DateTime.parse(json['plannedEndTime']   as String) : null,
+    actualStartTime:     json['actualStartTime']   != null
+                           ? DateTime.parse(json['actualStartTime']  as String) : null,
+    deliveredAt:         json['deliveredAt']       != null
+                           ? DateTime.parse(json['deliveredAt']      as String) : null,
+    driverPaymentAmount: (json['driverPaymentAmount']  as num?)?.toDouble(),
+    driverPaymentStatus: (json['driverPaymentStatus']  as String?) ?? 'pending',
+    hasIssues:           (json['hasIssues']            as bool?)  ?? false,
+    issueDescription:     json['issueDescription']     as String?,
+    deliveredToName:      json['deliveredToName']      as String?,
   );
+}
 }
 
 class TripApiService {
@@ -70,15 +79,20 @@ class TripApiService {
   Dio get _dio => _client.dio;
 
   Future<List<TripSummary>> getDriverTrips(String driverId) async {
-  final res = await _dio.get('/api/trips/driver/$driverId');
-  final list = res.data as List;
-  // TEMP DEBUG
-  if (list.isNotEmpty) {
-    print('TRIP JSON KEYS: ${(list.first as Map<String, dynamic>).keys.toList()}');
-    print('senderName: ${(list.first as Map<String, dynamic>)['senderName']}');
-    print('receiverName: ${(list.first as Map<String, dynamic>)['receiverName']}');
+  final url = '/api/trips/driver/$driverId';
+  print('>>> CALLING: ${_dio.options.baseUrl}$url');
+  print('>>> driverId: "$driverId" (length: ${driverId.length})');
+  
+  try {
+    final res = await _dio.get(url);
+    print('>>> STATUS: ${res.statusCode}');
+    final list = res.data as List;
+    return list.map((e) => TripSummary.fromJson(e as Map<String, dynamic>)).toList();
+  } on DioException catch (e) {
+    print('>>> 404 URL was: ${e.requestOptions.uri}');
+    print('>>> Response body: ${e.response?.data}');
+    rethrow;
   }
-  return list.map((e) => TripSummary.fromJson(e as Map<String, dynamic>)).toList();
 }
 
   Future<TripSummary?> getTripById(String tripId) async {

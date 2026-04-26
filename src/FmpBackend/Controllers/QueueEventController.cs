@@ -23,6 +23,14 @@ public class QueueEventsController : ControllerBase
         return Ok(result);
     }
 
+    // GET /api/queue-events/preview-drivers?rule={rule}
+    [HttpGet("preview-drivers")]
+    public async Task<IActionResult> GetDriverPreview([FromQuery] string rule = "highest_trips")
+    {
+        var result = await _service.GetDriverPreviewAsync(rule);
+        return Ok(result);
+    }
+
     // POST /api/queue-events  — create a new event
     [HttpPost]
     public async Task<IActionResult> CreateQueueEvent([FromBody] CreateQueueEventRequest request)

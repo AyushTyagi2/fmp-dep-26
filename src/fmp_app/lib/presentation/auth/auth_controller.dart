@@ -187,10 +187,6 @@ class AuthController extends ChangeNotifier {
           Navigator.pushReplacementNamed(context, '/sender-onboarding');
           break;
         
-        case 'fleet_onboarding':
-          debugPrint('  → Navigating to: /fleet-onboarding');
-          Navigator.pushReplacementNamed(context, '/fleet-onboarding');
-          break;
         case 'admin_dashboard':
           debugPrint('  → Navigating to: /system_admin');
           Navigator.pushReplacementNamed(context, '/system_admin');

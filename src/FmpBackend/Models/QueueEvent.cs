@@ -8,4 +8,5 @@ public class QueueEvent
     public DateTime EndTime       { get; set; }
     public int      WindowSeconds { get; set; }
     public string   Status        { get; set; } = "live"; // live, closed
+    public string   PriorityRule  { get; set; } = "highest_trips";
 }
