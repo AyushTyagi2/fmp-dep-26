@@ -15,6 +15,7 @@ class _CreateQueueEventScreenState extends State<CreateQueueEventScreen> {
   int     _windowMinutes = 2;
   bool    _submitting    = false;
   String? _error;
+  String  _selectedRule  = 'highest_trips';
 
   String _fmtDuration(double h) {
     if (h < 1) return '${(h * 60).round()} min';
@@ -45,6 +46,7 @@ class _CreateQueueEventScreenState extends State<CreateQueueEventScreen> {
       await widget.api.createQueueEvent(
         durationHours : _durationHours,
         windowSeconds : _windowMinutes * 60,
+        priorityRule  : _selectedRule,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -103,6 +105,12 @@ class _CreateQueueEventScreenState extends State<CreateQueueEventScreen> {
               max      : 30,
               divisions: 29,
               onChanged: (v) => setState(() => _windowMinutes = v.round()),
+            ),
+            const SizedBox(height: 28),
+
+            _RuleSection(
+              selectedRule: _selectedRule,
+              onChanged: (v) => setState(() => _selectedRule = v!),
             ),
             const SizedBox(height: 32),
 
@@ -374,5 +382,72 @@ class _ErrorBanner extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+// ── Rule section ──────────────────────────────────────────────────────────────
+
+class _RuleSection extends StatelessWidget {
+  final String selectedRule;
+  final ValueChanged<String?> onChanged;
+
+  const _RuleSection({
+    required this.selectedRule,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const Icon(Icons.rule_rounded, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          const Text('Priority Assignment Rule',
+              style: TextStyle(
+                fontSize  : 13,
+                fontWeight: FontWeight.w600,
+                color     : AppColors.textSecondary,
+              )),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selectedRule,
+            isExpanded: true,
+            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+            onChanged: onChanged,
+            items: const [
+              DropdownMenuItem(
+                value: 'highest_trips',
+                child: Text('Highest Trips First (Default)'),
+              ),
+              DropdownMenuItem(
+                value: 'youngest_drivers',
+                child: Text('Younger Drivers First'),
+              ),
+              DropdownMenuItem(
+                value: 'least_recently_active',
+                child: Text('Least Recently Active'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
   );
 }

@@ -933,6 +933,7 @@ class _CreateQueueSheetState extends State<_CreateQueueSheet>
   String  _durationUnit = 'hours';   // 'minutes' | 'hours'
   bool    _submitting   = false;
   String? _error;
+  String  _selectedRule = 'highest_trips';
 
   // ── enter animation ─────────────────────────────────────────────────────
   late AnimationController _ctrl;
@@ -994,6 +995,7 @@ class _CreateQueueSheetState extends State<_CreateQueueSheet>
       await widget.api.createQueueEvent(
         durationHours : _durationHours,
         windowSeconds : _windowMinutes * 60,
+        priorityRule  : _selectedRule,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -1236,6 +1238,28 @@ class _CreateQueueSheetState extends State<_CreateQueueSheet>
                     if (n > 60) return 'Max 60 min';
                     return null;
                   },
+                ),
+                const SizedBox(height: 20),
+
+                // ── Priority Rule field ──────────────────────────────────
+                Text('Priority Assignment Rule',
+                    style: AppTextStyles.labelMd
+                        .copyWith(color: AppColors.textSecondary)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value      : _selectedRule,
+                  style      : AppTextStyles.bodyMd,
+                  decoration : _fieldDecoration(
+                    label: 'Rule',
+                    hint : '',
+                    icon : Icons.rule_rounded,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'highest_trips', child: Text('Highest Trips First (Default)')),
+                    DropdownMenuItem(value: 'youngest_drivers', child: Text('Younger Drivers First')),
+                    DropdownMenuItem(value: 'least_recently_active', child: Text('Least Recently Active')),
+                  ],
+                  onChanged: (v) => setState(() => _selectedRule = v ?? 'highest_trips'),
                 ),
                 const SizedBox(height: 28),
 

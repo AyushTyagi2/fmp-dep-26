@@ -45,7 +45,8 @@ public class QueueEventService
             StartTime     = startTime,
             EndTime       = startTime.AddHours(request.DurationHours),
             WindowSeconds = request.WindowSeconds,
-            Status        = QueueEventStatus.Live
+            Status        = QueueEventStatus.Live,
+            PriorityRule  = request.PriorityRule ?? "highest_trips"
         };
         await _queueEventRepo.CreateAsync(queueEvent);
 
@@ -62,7 +63,7 @@ public class QueueEventService
 
     private async Task GenerateDriverQueue(QueueEvent queueEvent)
     {
-        var drivers = await _driverRepo.GetEligibleDriversAsync();
+        var drivers = await _driverRepo.GetEligibleDriversAsync(queueEvent.PriorityRule);
         var now     = DateTime.UtcNow;
 
         var entries = drivers.Select((driver, i) => new DriverQueueEntry

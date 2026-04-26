@@ -419,6 +419,7 @@ class ShipmentApiService {
   Future<void> createQueueEvent({
     required double durationHours,
     required int    windowSeconds,
+    required String priorityRule,
     String?         zoneId,
   }) async {
     try {
@@ -427,6 +428,7 @@ class ShipmentApiService {
         data: {
           'durationHours' : durationHours,
           'windowSeconds' : windowSeconds,
+          'priorityRule'  : priorityRule,
           if (zoneId != null) 'zoneId': zoneId,
         },
       );

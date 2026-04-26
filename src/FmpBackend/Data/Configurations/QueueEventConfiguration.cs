@@ -26,5 +26,9 @@ public class QueueEventConfiguration : IEntityTypeConfiguration<QueueEvent>
         builder.Property(e => e.EndTime)
             .HasColumnName("end_time")
             .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+        builder.Property(e => e.PriorityRule)
+            .HasColumnName("priority_rule")
+            .HasDefaultValue("highest_trips");
     }
 }

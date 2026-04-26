@@ -22,5 +22,8 @@ public class UserConfig : IEntityTypeConfiguration<User>
         entity.Property(e => e.CreatedAt)
               .HasColumnName("created_at")
               .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        entity.Property(e => e.DateOfBirth)
+              .HasColumnName("date_of_birth");
     }
 }
