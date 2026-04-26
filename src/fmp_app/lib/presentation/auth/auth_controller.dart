@@ -233,7 +233,6 @@ class AuthController extends ChangeNotifier {
         if (screen == 'admin_dashboard' || 
             screen == 'union_dashboard' ||
             screen == 'fleet_dashboard' ||
-            screen == 'fleet_onboarding' ||
             screen == 'unknown') {
           debugPrint('  ✓ Screen matched! Route condition: TRUE');
           await AppSession.save(
@@ -248,7 +247,6 @@ class AuthController extends ChangeNotifier {
             'admin_dashboard' => '/system_admin',
             'union_dashboard' => '/union-dashboard',
             'fleet_dashboard' => '/fleet-dashboard',
-            'fleet_onboarding' => '/fleet-onboarding',
             'unknown' => '/role-selection',
             _ => '/role-selection',
           };
