@@ -19,6 +19,7 @@ class _DriverBasicScreenState extends State<DriverBasicScreen> {
   final _vehicleNum   = TextEditingController();
   String _vehicleType = 'Truck';
   bool   _submitting  = false;
+  final _licenseNumber = TextEditingController();
   String? _error;
 
   final _authApi = AuthApi();
@@ -41,6 +42,7 @@ class _DriverBasicScreenState extends State<DriverBasicScreen> {
         email: AppSession.email ?? '',
         vehicleNumber: _vehicleNum.text.trim(),
         vehicleType: _vehicleType,
+        licenseNumber: _licenseNumber.text.trim(),
       );
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/approval-pending');
@@ -52,6 +54,7 @@ class _DriverBasicScreenState extends State<DriverBasicScreen> {
   @override
   void dispose() {
     _vehicleNum.dispose();
+    _licenseNumber.dispose();
     super.dispose();
   }
 
@@ -149,6 +152,53 @@ class _DriverBasicScreenState extends State<DriverBasicScreen> {
                         validator: (v) {
                           final s = v?.trim() ?? '';
                           if (s.length < 6) return 'Enter valid registration number';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      const Text('Driver License Number',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF374151))),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _licenseNumber,
+                        textCapitalization: TextCapitalization.characters,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2,
+                            color: Color(0xFF111827)),
+                        decoration: InputDecoration(
+                          hintText: 'DL-1234567890123',
+                          hintStyle: const TextStyle(
+                              letterSpacing: 0, fontWeight: FontWeight.w400),
+                          filled: true,
+                          fillColor: Colors.white,
+                          prefixIcon: const Icon(Icons.credit_card_rounded,
+                              size: 18, color: Color(0xFF6B7280)),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE5E9F0), width: 1.5)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE5E9F0), width: 1.5)),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFF1A56DB), width: 2)),
+                          errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFE02424), width: 1.5)),
+                        ),
+                        validator: (v) {
+                          final s = v?.trim() ?? '';
+                          if (s.length < 6) return 'Enter a valid license number';
                           return null;
                         },
                       ),

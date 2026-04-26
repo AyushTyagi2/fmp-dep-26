@@ -29,4 +29,11 @@ edge cases:-
 
 1. count = 2, it means 1 can be accepted whereas the countodown for 2 is still going on that mean accept b/w 1 or 2.
 2. just open s3 for D2 sooner and the past would still be claimable.
-3. we'll update it on each mutation. and rebubilt it
+3. we'll update it on each mutation. and rebubilt it.
+
+
+
+driver1:- 2 min(claimable)
+driver1:- 2 min(shipment2)
+
+driver 2 :- 

@@ -47,8 +47,24 @@ public class ShipmentService
             throw new Exception("User not found");
 
         var pickupAddress = await _addressRepo.GetDefaultByOwnerAsync(senderOrg.Id, "organization");
-        if (pickupAddress == null)
-            throw new Exception("Pickup address not found");
+
+if (pickupAddress == null)
+{
+    Console.WriteLine("No DEFAULT pickup address found. Checking ANY active address...");
+
+    var fallback = await _addressRepo.GetAnyActiveByOwnerAsync(senderOrg.Id, "organization");
+    //vc
+    if (fallback != null)
+    {
+        Console.WriteLine("Found NON-DEFAULT address: {0}", fallback.Id);
+    }
+    else
+    {
+        Console.WriteLine("No address at all found for OwnerId: {0}", senderOrg.Id);
+    }
+
+    throw new Exception("Pickup address not found");
+}
 
         var dropAddress = await _addressRepo.GetDefaultByOwnerAsync(receiverOrg.Id, "organization");
         if (dropAddress == null)

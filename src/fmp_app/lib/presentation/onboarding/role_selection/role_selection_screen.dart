@@ -63,14 +63,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
       color: Color(0xFF0E9F6E),
       bg: Color(0xFFDEF7EC),
     ),
-    _RoleOption(
-      id: 'fleet_owner',
-      label: 'Fleet Manager',
-      subtitle: 'Manage drivers, vehicles & trips',
-      icon: Icons.account_balance_rounded,
-      color: Color(0xFFD97706),
-      bg: Color(0xFFFEF3C7),
-    ),
+    
     
   ];
 

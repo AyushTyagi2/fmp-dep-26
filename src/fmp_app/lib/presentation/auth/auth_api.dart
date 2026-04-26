@@ -45,13 +45,15 @@ class AuthApi {
     required String email,
     required String vehicleNumber,
     required String vehicleType,
+    required String licenseNumber,
   }) async {
     await _dio.post(
       "/drivers/driver-details",
       data: {
-        "email": email,
+        "Phone": email,
         "vehicleNumber": vehicleNumber,
         "vehicleType": vehicleType,
+        "licenseNumber": licenseNumber,
       },
     );
   }

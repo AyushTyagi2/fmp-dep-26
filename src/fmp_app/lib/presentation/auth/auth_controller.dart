@@ -173,9 +173,7 @@ class AuthController extends ChangeNotifier {
         case 'sender_onboarding':
           Navigator.pushReplacementNamed(context, '/sender-onboarding');
           break;
-        case 'fleet_dashboard':
-          Navigator.pushReplacementNamed(context, '/fleet-dashboard');
-          break;
+        
         case 'fleet_onboarding':
           Navigator.pushReplacementNamed(context, '/fleet-onboarding');
           break;
@@ -203,31 +201,37 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<bool> tryAutoRoute(BuildContext context) async {
-    try {
-      for (final role in ['SUPER_ADMIN', 'UNION_MANAGER']) {
-        final res = await _authApi.resolveRole(email!, role);
-        final screen = res['screen'] as String?;
-        debugPrint('tryAutoRoute: role=$role, screen=$screen');
+  try {
+    for (final role in ['SUPER_ADMIN', 'UNION_MANAGER', 'FLEET_MANAGER']) {
+      final res = await _authApi.resolveRole(email!, role);
+      final screen = res['screen'] as String?;
+      debugPrint('tryAutoRoute: role=$role, screen=$screen');
 
-        if (screen == 'admin_dashboard' || screen == 'union_dashboard') {
-          await AppSession.save(
-            email: email!,
-            token: res['token'] as String,
-            driverId: null,
-            role: role,
-          );
-          if (!context.mounted) return false;
-          Navigator.pushReplacementNamed(
-            context,
-            screen == 'admin_dashboard' ? '/system_admin' : '/union-dashboard',
-          );
-          return true;
-        }
+      if (screen == 'admin_dashboard' || 
+          screen == 'union_dashboard' ||
+          screen == 'fleet_dashboard') {
+        await AppSession.save(
+          email: email!,
+          token: res['token'] as String,
+          driverId: null,
+          role: role,
+        );
+        if (!context.mounted) return false;
+
+        final route = switch (screen) {
+          'admin_dashboard' => '/system_admin',
+          'union_dashboard' => '/union-dashboard',
+          'fleet_dashboard' => '/fleet-dashboard',
+          _ => '/role-selection',
+        };
+
+        Navigator.pushReplacementNamed(context, route);
+        return true;
       }
-    } catch (_) {}
-    return false;
-  }
-
+    }
+  } catch (_) {}
+  return false;
+}
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   void _startTimer() {

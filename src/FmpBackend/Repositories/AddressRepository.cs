@@ -23,4 +23,10 @@ public class AddressRepository
                 a.IsActive)
             .FirstOrDefaultAsync();
     }
+      public async Task<Address?> GetAnyActiveByOwnerAsync(Guid ownerId, string ownerType)
+{
+    return await _context.Addresses
+        .Where(a => a.OwnerId == ownerId && a.OwnerType == ownerType && a.IsActive)
+        .FirstOrDefaultAsync();
+}
 }
