@@ -1258,6 +1258,11 @@ class _CreateQueueSheetState extends State<_CreateQueueSheet>
                     DropdownMenuItem(value: 'highest_trips', child: Text('Highest Trips First (Default)')),
                     DropdownMenuItem(value: 'youngest_drivers', child: Text('Younger Drivers First')),
                     DropdownMenuItem(value: 'least_recently_active', child: Text('Least Recently Active')),
+                    DropdownMenuItem(
+                      value: 'closest_to_receiver', 
+                      enabled: false, 
+                      child: Text('Closest to Receiver (Coming Soon!)', style: TextStyle(color: AppColors.textHint))
+                    ),
                   ],
                   onChanged: (v) => setState(() => _selectedRule = v ?? 'highest_trips'),
                 ),

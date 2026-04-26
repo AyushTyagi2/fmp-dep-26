@@ -473,6 +473,11 @@ class _RuleSection extends StatelessWidget {
                 value: 'least_recently_active',
                 child: Text('Least Recently Active'),
               ),
+              DropdownMenuItem(
+                value: 'closest_to_receiver',
+                enabled: false,
+                child: Text('Closest to Receiver (Coming Soon!)', style: TextStyle(color: AppColors.textHint)),
+              ),
             ],
           ),
         ),
